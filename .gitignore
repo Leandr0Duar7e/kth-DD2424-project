@@ -24,12 +24,27 @@ var/
 *.egg
 
 # Model weights and checkpoints
-models/resnet/*
-models/vit/*
-models/experiments/*
 !models/resnet/.gitkeep
 !models/vit/.gitkeep
 !models/experiments/.gitkeep
+models/resnet/binary/*
+models/resnet/multiclass/*
+models/resnet/pretrained/*
+models/vit/binary/*
+models/vit/multiclass/*
+models/vit/pretrained/*
+models/experiments/exp1_baseline/*
+models/experiments/exp2_finetune_layers/*
+models/experiments/exp3_gradual_unfreeze/*
+!models/resnet/binary/.gitkeep
+!models/resnet/multiclass/.gitkeep
+!models/resnet/pretrained/.gitkeep
+!models/vit/binary/.gitkeep
+!models/vit/multiclass/.gitkeep
+!models/vit/pretrained/.gitkeep
+!models/experiments/exp1_baseline/.gitkeep
+!models/experiments/exp2_finetune_layers/.gitkeep
+!models/experiments/exp3_gradual_unfreeze/.gitkeep
 *.pth
 *.pt
 *.h5
@@ -38,12 +53,25 @@ models/experiments/*
 *.pkl
 
 # Datasets and large files
-data/raw/*
-data/interim/*
-data/processed/*
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+data/interim/binary/*
+data/interim/multiclass/*
+data/processed/full/*
+data/processed/imbalanced/*
+data/processed/semi_1/*
+data/processed/semi_10/*
+data/processed/semi_50/*
+data/raw/oxford_pets/*
+!data/interim/binary/.gitkeep
+!data/interim/multiclass/.gitkeep
+!data/processed/full/.gitkeep
+!data/processed/imbalanced/.gitkeep
+!data/processed/semi_1/.gitkeep
+!data/processed/semi_10/.gitkeep
+!data/processed/semi_50/.gitkeep
+!data/raw/oxford_pets/.gitkeep
 *.jpg
 *.jpeg
 *.png
