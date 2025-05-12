@@ -1,0 +1,170 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2024
+
+
+% ready for submission
+\usepackage[final]{neurips_2024}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2024}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2024}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2024}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{graphicx}       % for including images
+
+
+\title{Comparing ResNet and Vision Transformers: Supervised vs Semi-Supervised Learning for Pet Breed Classification}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{%
+  Francesco Olivieri \\
+  KTH Royal Institute of Technology \\
+  \texttt{olivieri@kth.se} \\
+  \And
+  Inês Mesquita \\
+  KTH Royal Institute of Technology \\
+  \texttt{inesm@kth.se} \\
+  \And
+  Leandro Duarte \\
+  KTH Royal Institute of Technology \\
+  \texttt{ldr0@kth.se} \\
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\begin{abstract}
+% Brief overview of the project, approach, and key results
+% Should be no more than 300 words
+\end{abstract}
+
+
+\section{Introduction}
+% Describe the problem and its importance
+% Briefly describe what you did and give an overview of results
+% Why is transfer learning important?
+% Why compare ResNet and ViT?
+% Why study semi-supervised learning?
+
+
+\section{Related Work}
+% Discuss published work related to:
+% 1. Transfer learning with CNNs and Vision Transformers
+% 2. Semi-supervised learning techniques
+% 3. Pet breed classification or similar fine-grained classification tasks
+
+
+\section{Data}
+% Describe the Oxford-IIIT Pet Dataset
+% How much data, what kind of images
+% Data preprocessing and augmentation
+% Data splits for supervised and semi-supervised experiments
+% How was data reduced for the semi-supervised experiments
+
+
+\section{Methods}
+% Describe your approaches in detail:
+
+
+\subsection{Models}
+% ResNet architecture and configuration
+% Vision Transformer architecture and configuration
+
+
+\subsection{Transfer Learning Approaches}
+% Fine-tuning strategies for ResNet
+% Fine-tuning strategies for Vision Transformer
+% Hyperparameters and optimization details
+
+
+\subsection{Semi-Supervised Learning}
+% Description of the semi-supervised learning technique(s) used
+% Implementation details
+
+
+\section{Experiments}
+% Detailed description of experiments and results
+
+
+\subsection{Binary Classification}
+% Results from dog vs cat classification
+
+
+\subsection{Multi-Class Classification with Full Supervision}
+% Results from 37-class breed classification with full supervision
+% Comparison of fine-tuning strategies
+% Comparison of ResNet vs ViT
+
+
+\subsection{Multi-Class Classification with Semi-Supervision}
+% Results from semi-supervised learning experiments
+% Performance with varying amounts of labeled data (50%, 10%, 1%)
+% Comparison between ResNet and ViT in semi-supervised setting
+
+
+\subsection{Ablation Studies}
+% Effect of different components of your approach
+% Learning rate strategies, regularization, etc.
+
+
+\section{Conclusion}
+% Summary of key findings
+% Limitations of the study
+% Suggestions for future work
+
+
+\section{Broader Impacts}
+% Discuss potential positive societal impacts
+% Discuss potential negative societal impacts
+% Consider fairness, privacy, security implications
+
+
+\section*{References}
+% List all references
+
+
+\appendix
+\section{Additional Experiments}
+% Place for any additional results that didn't fit in the main paper
+
+
+\section{Implementation Details}
+% More detailed information about implementations
+% Hyperparameter settings, training configurations
+
+
+\end{document}
