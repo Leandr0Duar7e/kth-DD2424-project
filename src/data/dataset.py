@@ -7,18 +7,6 @@ import pandas as pd
 import torch
 
 
-'''
-def get_transforms():
-    # ResNet50 expects 224x224 input images
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # Resize to maintain aspect ratio
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                           std=[0.229, 0.224, 0.225])  # ImageNet normalization
-    ])
-    return transform
-'''
-
 def get_transforms():
     """
     Get image transformations for the Oxford Pet Dataset
@@ -26,7 +14,8 @@ def get_transforms():
         transforms.Compose: Image transformations for ResNet50
     """
     return transforms.Compose([
-        transforms.Resize((224, 224)),  # ResNet50 expects 224x224 input
+        transforms.Resize(224),  
+        transforms.CenterCrop(224), # ResNet50 expects 224x224 input
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                            std=[0.229, 0.224, 0.225])  # ImageNet normalization
@@ -60,15 +49,11 @@ class OxfordPetDataset(Dataset):
                     species_id = int(parts[2])
                     breed_id = int(parts[3])
                     
-                    # Convert class name to binary (dog=1, cat=0) if needed
+                   
                     if binary_classification:
-                        label = 1 if species_id == 2 else 0  
+                        label = 1 if species_id == 2 else 0   #  (dog=1, cat=0) 
                     else:
-                        # For multi-class -> 0-24 for cats, 25-36 for dogs
-                        if species_id == 1:  
-                            label = breed_id - 1  
-                        else: 
-                            label = breed_id + 24 
+                        label = class_id - 1    # 0-36 classes
                     self.data.append((image_name, label))
     
     def __len__(self):

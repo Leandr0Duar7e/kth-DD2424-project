@@ -4,7 +4,7 @@ from models.resnet import get_ResNet50_model
 from data.dataset import get_oxford_pet_dataloaders
 import os
 
-def evaluate_model(model, test_loader, criterion, device, binary_classification):
+def evaluate_model(model, device, test_loader, criterion, binary_classification):
     model.eval()
     total_loss = 0.0
     correct_pred = 0
@@ -12,7 +12,13 @@ def evaluate_model(model, test_loader, criterion, device, binary_classification)
 
     with torch.no_grad():
         for inputs, labels in test_loader:
-            inputs, labels = inputs.to(device), labels.float().to(device)
+            inputs = inputs.to(device)
+           
+            if binary_classification:
+                labels = labels.float().to(device)
+            else:
+                labels = labels.long().to(device)
+                
             outputs = model(inputs)
             loss = criterion(outputs.squeeze(), labels)
             
@@ -40,7 +46,7 @@ def train_model_with_adam(model, device, train_loader, val_loader, binary_classi
     }
     
     # Training loop
-    print(f"Start Training {model.__class__.__name__} for {num_epochs} epochs")
+    print(f" Start Training {model.__class__.__name__} for {num_epochs} epochs")
     
     for epoch in range(num_epochs):
         # Training
@@ -50,7 +56,12 @@ def train_model_with_adam(model, device, train_loader, val_loader, binary_classi
         train_total = 0
 
         for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.float().to(device)
+            inputs = inputs.to(device)
+            # Convert labels to appropriate type based on classification type
+            if binary_classification:
+                labels = labels.float().to(device)
+            else:
+                labels = labels.long().to(device)
             
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -64,7 +75,7 @@ def train_model_with_adam(model, device, train_loader, val_loader, binary_classi
             train_correct += (predicted.squeeze() == labels).sum().item()
 
         # Validation
-        val_loss, val_acc = evaluate_model(model, val_loader, criterion, device, binary_classification)
+        val_loss, val_acc = evaluate_model(model, device, val_loader, criterion, binary_classification)
 
         # Record metrics
         history['train_loss'].append(train_loss/len(train_loader))
