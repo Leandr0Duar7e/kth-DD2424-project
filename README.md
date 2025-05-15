@@ -4,47 +4,29 @@ This project explores and compares the performance of ResNet and Vision Transfor
 
 ## Project Structure
 
+The current implementation includes:
+
 ```
 kth-DD2424-project/
 ├── data/                           # Data directory
-│   ├── raw/                        # Original immutable data
-│   │   └── oxford_pets/            # Original Oxford-IIIT Pet Dataset
-│   │       ├── images/             # Original images
-│   │       └── annotations/        # Dataset annotations and labels
-│   ├── interim/                    # Intermediate processed data
-│   │   ├── binary/                 # Data processed for binary classification (cats vs dogs)
-│   │   └── multiclass/             # Data processed for breed classification (37 classes)
-│   └── processed/                  # Final processed datasets ready for model training
-│       ├── full/                   # 100% of labeled data
-│       ├── imbalanced/             # Imbalanced dataset with reduced examples for some classes
-│       ├── semi_1/                 # 1% labeled data setup for semi-supervised learning
-│       ├── semi_10/                # 10% labeled data setup for semi-supervised learning
-│       └── semi_50/                # 50% labeled data setup for semi-supervised learning
+│   └── raw/                        # Original Oxford-IIIT Pet Dataset
+│       ├── images/                 # Original images
+│       └── annotations/            # Dataset annotations and labels
 ├── models/                         # Saved model checkpoints
-│   ├── resnet/                     # ResNet models
-│   │   ├── binary/                 # Fine-tuned models for binary classification
-│   │   ├── multiclass/             # Fine-tuned models for multiclass classification
-│   │   └── pretrained/             # Pretrained ResNet models
-│   ├── vit/                        # Vision Transformer models
-│   │   ├── binary/                 # Fine-tuned ViT models for binary classification
-│   │   ├── multiclass/             # Fine-tuned ViT models for multiclass classification
-│   │   └── pretrained/             # Pretrained ViT models
-│   └── experiments/                # Models from specific experiments
-│       ├── exp1_baseline/          # Baseline experiment results
-│       ├── exp2_finetune_layers/   # Results from fine-tuning different layers
-│       └── exp3_gradual_unfreeze/  # Results from gradual unfreezing approach
+│   └── resnet/                     # ResNet models
+│       ├── binary/                 # Fine-tuned models for binary classification
+│       ├── multiclass/             # Fine-tuned models for multiclass classification
+│       └── pretrained/             # Pretrained ResNet models
 ├── src/                            # Source code
-│   ├── data/                       # Data processing code
 │   ├── models/                     # Model definitions
-│   ├── training/                   # Training code
-│   ├── evaluation/                 # Evaluation code
-│   └── utils/                      # Utility functions
-├── scripts/                        # Scripts for different stages
-├── results/                        # Experiment results, metrics, etc.
-├── figures/                        # Generated figures for analysis
-├── report/                         # Report and presentation materials
-├── requirements.txt                # Project dependencies
-└── README.md                       # This file
+│   │   └── resnet.py               # ResNet50 model implementation
+│   ├── dataset.py                  # Dataset loading and preprocessing
+│   ├── trainer.py                  # Model training and evaluation
+│   ├── utils.py                    # Utility functions
+│   ├── main.py                     # Command-line interface
+│   ├── app.py                      # Web interface (in progress)
+│   └── evaluation.py               # Evaluation code (placeholder)
+└── requirements.txt                # Project dependencies
 ```
 
 ## Setup and Installation
@@ -54,36 +36,79 @@ kth-DD2424-project/
    ```
    pip install -r requirements.txt
    ```
-3. Download the Oxford-IIIT Pet Dataset and place it in `data/raw/oxford_pets/`
+3. Download the Oxford-IIIT Pet Dataset and place it in `data/raw/`
+   - The dataset should contain an `images` folder with all pet images
+   - It should also have an `annotations` folder with the label information
 
 ## Running the Project
 
-The project is divided into several stages:
+The project can be run in two ways: using the command-line interface or the web interface.
 
-1. **Data Preparation**:
-   ```
-   python scripts/1_prepare_data.py
-   ```
+### Command-Line Interface
 
-2. **Binary Classification** (Dogs vs Cats):
-   ```
-   python scripts/2_binary_classification.py
-   ```
+The `main.py` script provides a command-line interface for running experiments:
 
-3. **Multi-Class Classification** (37 Breeds):
-   ```
-   python scripts/3_multiclass_classification.py
-   ```
+```bash
+cd src
+python main.py
+```
 
-4. **Semi-Supervised Learning**:
-   ```
-   python scripts/4_semi_supervised_learning.py
-   ```
+This will present you with options:
+1. **Binary Classification (Dogs vs Cats)**: Fine-tunes a ResNet50 model for binary classification with Adam optimizer.
+2. **Multi-Class Classification (37 Breeds)**: Fine-tunes a ResNet50 model for multi-class breed classification.
 
-5. **Generate Figures** for the report:
-   ```
-   python scripts/5_generate_figures.py
-   ```
+For each experiment, you can specify:
+- The number of layers to train in addition to the final layer
+- The number of epochs to train
+
+The model will be trained on the Oxford-IIIT Pet Dataset, and the results will be displayed at the end.
+
+### Example Usage:
+
+```bash
+# Run the binary classification experiment
+python main.py
+# Then choose option 1 and follow the prompts
+```
+
+## Implemented Features
+
+The current implementation includes:
+
+1. **ResNet50 Model**:
+   - Pre-trained ResNet50 backbone
+   - Option to freeze/unfreeze specific layers
+   - Support for both binary and multi-class classification
+
+2. **Data Processing**:
+   - Oxford-IIIT Pet Dataset loading and preprocessing
+   - Image transformations for ResNet50
+   - Train/validation/test splitting
+
+3. **Training & Evaluation**:
+   - Model training with Adam optimizer
+   - Progress tracking and metrics (loss, accuracy)
+   - Model evaluation on test set
+   - Option to save trained models
+
+4. **User Interface**:
+   - Command-line interface for running experiments
+   - Web interface for easier interaction (in progress)
+
+## Web Application (Experimental)
+
+A web application has been developed to provide an easy-to-use interface for the pet classification experiments. This is still a work in progress and might not function properly yet.
+
+To run the web application:
+
+```bash
+cd src
+uvicorn app:app --reload
+```
+
+The application will be available at: http://127.0.0.1:8000
+
+**Note**: The web application requires additional dependencies like `gradio`, `fastapi`, and `uvicorn`. These are included in the `requirements.txt` file.
 
 ## Team
 
