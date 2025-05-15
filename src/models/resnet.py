@@ -5,6 +5,18 @@ import torch.nn as nn
 
 
 class ResNet50(nn.Module):
+    """
+    ResNet50 model for pet classification
+
+    Attributes:
+        backbone (torchvision.models.ResNet): The ResNet50 model
+
+    Args:
+        binary_classification (bool): If True, model outputs binary classification (dog/cat)
+        freeze_backbone (bool): If True, backbone layers are frozen by default
+        num_train_layers (int, optional): Number of layers from the end to unfreeze for training
+    """
+
     def __init__(
         self, binary_classification=True, freeze_backbone=True, num_train_layers=None
     ):
@@ -41,17 +53,5 @@ class ResNet50(nn.Module):
             param.requires_grad = True
 
     def forward(self, x):
+        """Forward pass through the network"""
         return self.backbone(x)
-
-
-def get_ResNet50_model(binary_classification, freeze_backbone, num_train_layers=None):
-    """
-    Get a ResNet50 model for pet classification
-    Args:
-        binary_classification (bool): If True, model outputs binary classification (dog/cat)
-        freeze_backbone (bool): If True, backbone layers are frozen by default
-        num_train_layers (int, optional): Number of layers from the end to unfreeze for training
-    Returns:
-        ResNet50: Configured ResNet50 model
-    """
-    return ResNet50(binary_classification, freeze_backbone, num_train_layers)
