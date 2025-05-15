@@ -1,50 +1,21 @@
 \documentclass{article}
 
-% if you need to pass options to natbib, use, e.g.:
-%     \PassOptionsToPackage{numbers, compress}{natbib}
-% before loading neurips_2024
-
-
-% ready for submission
+% Use NeurIPS style
 \usepackage[final]{neurips_2024}
 
-
-% to compile a preprint version, e.g., for submission to arXiv, add add the
-% [preprint] option:
-%     \usepackage[preprint]{neurips_2024}
-
-
-% to compile a camera-ready version, add the [final] option, e.g.:
-%     \usepackage[final]{neurips_2024}
-
-
-% to avoid loading the natbib package, add option nonatbib:
-%    \usepackage[nonatbib]{neurips_2024}
-
-
-\usepackage[utf8]{inputenc} % allow utf-8 input
-\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
-\usepackage{hyperref}       % hyperlinks
-\usepackage{url}            % simple URL typesetting
-\usepackage{booktabs}       % professional-quality tables
-\usepackage{amsfonts}       % blackboard math symbols
-\usepackage{nicefrac}       % compact symbols for 1/2, etc.
-\usepackage{microtype}      % microtypography
-\usepackage{xcolor}         % colors
-\usepackage{graphicx}       % for including images
-
+% Additional packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
 
 \title{Comparing ResNet and Vision Transformers: Supervised vs Semi-Supervised Learning for Pet Breed Classification}
-
-
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to LaTeX to determine where to break the
-% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
-% authors names on the first line, and the last on the second line, try using
-% \AND instead of \And before the third author name.
-
 
 \author{%
   Francesco Olivieri \\
@@ -60,20 +31,17 @@
   \texttt{ldr0@kth.se} \\
 }
 
-
 \begin{document}
 
-
 \maketitle
-
 
 \begin{abstract}
 % Brief overview of the project, approach, and key results
 % Should be no more than 300 words
 \end{abstract}
 
-
 \section{Introduction}
+
 % Describe the problem and its importance
 % Briefly describe what you did and give an overview of results
 % Why is transfer learning important?
@@ -118,10 +86,18 @@
 
 \section{Experiments}
 % Detailed description of experiments and results
+Library used: PyTorch
 
 
 \subsection{Binary Classification}
 % Results from dog vs cat classification
+In this experiment, we used ResNet50 with Adam optimizer. We replaced the last layer of the network for binary classification and fine-tuned only this latter, while the backbone was frozen. The images of the dataset were resized before feeded in the network, as ResNet50 expects images of size 224x224. This transformation was performed by resizing the shortest side to target length, and then cropped to form the 224x224 input image. The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.32\%. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.\textwidth]{E_1.png}
+    \caption{Accuracy and loss plots}
+\end{figure}
 
 
 \subsection{Multi-Class Classification with Full Supervision}
@@ -165,6 +141,5 @@
 \section{Implementation Details}
 % More detailed information about implementations
 % Hyperparameter settings, training configurations
-
 
 \end{document}
