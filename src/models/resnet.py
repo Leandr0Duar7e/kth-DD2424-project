@@ -18,7 +18,7 @@ class ResNet50(nn.Module):
     """
 
     def __init__(
-        self, binary_classification=True, freeze_backbone=True, num_train_layers=None
+        self, binary_classification=False, freeze_backbone=False, num_train_layers=None
     ):
         super(ResNet50, self).__init__()
 
@@ -55,3 +55,12 @@ class ResNet50(nn.Module):
     def forward(self, x):
         """Forward pass through the network"""
         return self.backbone(x)
+    
+    def get_index_weighted_layers(self):
+        layers = list(self.backbone.children())
+
+        param_layers = [i for i, layer in enumerate(layers) if any(True for _ in layer.parameters())]
+
+        return param_layers
+
+

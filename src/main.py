@@ -123,15 +123,15 @@ def run_experiment_2():
     print("=" * 70)
 
     # Get number of layers to train
-    num_train_layers = int(
-        input("\nHow many layers to train? (-1 for gradient unfreezing): ")
-    )
-
+    user_input = int(
+        input("\nSelect training option: \n n>0: train n layers \n '-1': gradually unfreeze each layer \n '-2': different learning rate for each layer and no data augmentation \n '-3': different learning rates for each layer and data augmentation")
+    )               
+             
     # Load data
     print("\nLoading Oxford-IIIT Pet Dataset for multi-class classification...")
     train_loader, val_loader, test_loader, num_classes = (
         OxfordPetDataset.get_dataloaders(
-            data_dir="../data/raw", batch_size=32, binary_classification=False
+            data_dir="../data/raw", batch_size=32, binary_classification=False, data_augmentation=True if user_input == -3 else False
         )
     )
     print(
@@ -143,36 +143,45 @@ def run_experiment_2():
     for _ in tqdm(range(5), desc="Loading model"):
         time.sleep(0.5)  # Simulate loading time
 
-    if num_train_layers == -1:
+
+    
+    if user_input == -2 or user_input == -3:
         # For gradual unfreezing, backbone is initially frozen, and trainer handles unfreezing
         model = ResNet50(
             binary_classification=False,
-            freeze_backbone=True,  # Important: Trainer will unfreeze layers gradually
+            freeze_backbone=False,  # Important: Trainer will unfreeze layers gradually
             num_train_layers=0,  # Initially, only classifier is unfrozen by ResNet50 class
         )
     else:
+        
         model = ResNet50(
             binary_classification=False,
             freeze_backbone=True,  # ResNet50 handles unfreezing based on num_train_layers
-            num_train_layers=num_train_layers,
+            num_train_layers=user_input if user_input > 0 else 0,
         )
 
     # Get device
     device = get_device()
 
     # Create trainer
-    trainer = ModelTrainer(model, device, binary_classification=False)
+    if user_input == -2 or user_input == -3: # Different learning rates for each layer
+        learning_rates = [1e-3, 5e-4, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7, 5e-8]
+    else:
+        learning_rates = [0.001]
+    trainer = ModelTrainer(model, device, binary_classification=False, learning_rate=learning_rates)
 
     # Display Swedish humor
     print(f"\n{get_swedish_waiting_message()}")
 
     # Train model
-    if num_train_layers == -1:
+    if user_input == -1:
         print("\nStarting training with Gradual Unfreezing...")
         model, history = trainer.train_gradual_unfreezing(
             train_loader, val_loader, num_epochs=3, print_graph=True
         )
-    else:
+    else:        
+        
+        # TODO: ADD LEARNING RATES
         model, history = trainer.train(
             train_loader, val_loader, num_epochs=3, print_graph=True
         )
