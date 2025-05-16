@@ -105,6 +105,7 @@ class OxfordPetDataset(Dataset):
 
         # Calculate split sizes
         total_size = len(dataset)
+        print(f"Total size of dataset: {total_size}")
         train_size = int(0.8 * total_size)
         val_size = int(0.1 * total_size)
         test_size = total_size - train_size - val_size

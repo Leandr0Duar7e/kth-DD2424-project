@@ -37,7 +37,7 @@ class ResNet50(nn.Module):
             for param in self.backbone.parameters():
                 param.requires_grad = False
 
-            if num_train_layers is not None:
+            if num_train_layers is not None and num_train_layers > 0:
                 # Get all layers in the backbone
                 layers = list(self.backbone.children())[:-1]
 
