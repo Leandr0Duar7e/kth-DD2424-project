@@ -129,7 +129,7 @@ class OxfordPetDataset(Dataset):
         )
         
         if data_augmentation:
-            train_transform = get_transforms(data_augmentation=True)
+            train_transform = cls.get_transforms(data_augmentation=True)
             train_dataset.transform = train_transform
         
         # Create data loaders
