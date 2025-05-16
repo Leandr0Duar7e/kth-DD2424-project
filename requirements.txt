@@ -5,7 +5,3 @@ matplotlib==3.10.1
 pandas==2.2.3
 tqdm==4.67.1
 pillow==11.1.0
-python-dateutil==2.9.0.post0
-gradio==5.29.1
-uvicorn==0.34.2
-fastapi==0.115.12
