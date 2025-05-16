@@ -51,7 +51,7 @@ The `main.py` script provides a command-line interface for running experiments:
 ```bash
 cd src
 python main.py
-```
+   ```
 
 This will present you with options:
 1. **Binary Classification (Dogs vs Cats)**: Fine-tunes a ResNet50 model for binary classification with Adam optimizer.
@@ -93,22 +93,103 @@ The current implementation includes:
 
 4. **User Interface**:
    - Command-line interface for running experiments
-   - Web interface for easier interaction (in progress)
 
-## Web Application (Experimental)
+## Running on Google Cloud VM
 
-A web application has been developed to provide an easy-to-use interface for the pet classification experiments. This is still a work in progress and might not function properly yet.
+This section outlines how to set up and run the project on a shared Google Cloud VM.
 
-To run the web application:
+**Phase 1: Your Local Machine Setup (One-Time)**
 
-```bash
-cd src
-uvicorn app:app --reload
-```
+1.  **Install Google Cloud SDK (`gcloud` CLI)**:
+    *   If you don't have it installed, download and install it from the official Google Cloud documentation: [Install the Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+    *   Follow the instructions for your operating system.
 
-The application will be available at: http://127.0.0.1:8000
+2.  **Initialize and Configure `gcloud`**:
+    *   Open a new terminal on your local machine.
+    *   Run the command:
+        ```bash
+        gcloud init
+        ```
+    *   **Login**: Your web browser will open, prompting you to log in. Use the Google account that has been granted access to the GCP project.
+    *   **Choose Project**: When prompted to pick a cloud project, select the appropriate project ID (e.g., `proud-voice-459917-p7`).
+    *   **Default Region and Zone**:
+        *   The tool will ask: `Do you want to configure a default Compute Region and Zone? (Y/n)?` Type `Y` and press Enter.
+        *   When prompted for the default region, enter the VM's region (e.g., `asia-east1`).
+        *   When prompted for the default zone, enter the VM's zone (e.g., `asia-east1-c`).
 
-**Note**: The web application requires additional dependencies like `gradio`, `fastapi`, and `uvicorn`. These are included in the `requirements.txt` file.
+**Phase 2: Getting Your Code to the VM (Do this when you update code)**
+
+1.  **Archive Your Project Locally**:
+    *   Open your local terminal and navigate to the directory that *contains* your project folder (e.g., if your project is `~/Projects/kth-DD2424-project`, then `cd ~/Projects/`).
+    *   Run this command to create a compressed archive. This excludes the `.git` history and `.DS_Store` files, making the archive smaller and the transfer faster:
+        ```bash
+        tar --exclude='.git' --exclude='.DS_Store' -czvf kth-DD2424-project.tar.gz kth-DD2424-project
+        ```
+        (This creates an archive named `kth-DD2424-project.tar.gz` in the current directory).
+
+2.  **Copy the Archive to the VM**:
+    *   From the same local directory where you created the archive, run:
+        ```bash
+        gcloud compute scp kth-DD2424-project.tar.gz YOUR_VM_NAME:~/
+        ```
+        (Replace `YOUR_VM_NAME` with the actual name of your VM, e.g., `deeplearning-1-vm`).
+
+**Phase 3: Setup & Run on the VM**
+
+1.  **Connect to the VM via SSH**:
+    *   In your local terminal, run:
+        ```bash
+        gcloud compute ssh YOUR_VM_NAME
+        ```
+    *   If it's your first time connecting from your computer, `gcloud` might generate SSH keys. Follow the prompts (you can typically accept defaults and opt for no passphrase for simplicity).
+
+2.  **Prepare Project on VM (First time, or if you re-copied the .tar.gz)**:
+    *   You'll be in your home directory (`~`) on the VM.
+    *   If you have an old version of the project directory on the VM, remove it first:
+        ```bash
+        rm -rf ~/kth-DD2424-project
+        ```
+    *   Extract your newly copied archive:
+        ```bash
+        tar -xzvf ~/kth-DD2424-project.tar.gz
+        ```
+    *   (Optional) Delete the archive file from the VM to save space:
+        ```bash
+        rm ~/kth-DD2424-project.tar.gz
+        ```
+
+3.  **Navigate to Project & Setup Python Environment**:
+    *   Change into your project directory on the VM:
+        ```bash
+        cd ~/kth-DD2424-project
+        ```
+    *   Create a Python virtual environment:
+        ```bash
+        python3 -m venv .venv
+        ```
+    *   Activate the virtual environment:
+        ```bash
+        source .venv/bin/activate
+        ```
+        (Your terminal prompt should now start with `(.venv)`).
+    *   Install project dependencies:
+        ```bash
+        pip install -r requirements.txt
+        ```
+
+4.  **Run Your Code**:
+    *   Ensure the virtual environment is active (see `(.venv)` in your prompt).
+    *   Navigate to your source code directory (e.g., `cd src` if your main script is there).
+    *   Execute your script (example):
+        ```bash
+        python main.py --model_type resnet --epochs 10
+        ```
+        (Adjust the script name and arguments based on your `main.py`).
+
+**Important Notes for VM Usage:**
+*   **Updating Code on VM**: To update the code, repeat Phase 2 (archive locally, copy archive) and then on the VM, delete the old project folder (if it exists) and re-extract the new archive (Phase 3, Step 2). You typically don't need to recreate the `.venv` or reinstall *all* requirements unless your `requirements.txt` file has changed.
+*   **Exiting the VM**: Type `exit` in the VM's terminal to return to your local machine.
+*   **Stopping the VM**: Coordinate with your team to **stop the VM** from the Google Cloud Console (Compute Engine > VM Instances page) when no one is actively using it. This helps manage costs, especially for VMs with GPUs.
 
 ## Team
 
