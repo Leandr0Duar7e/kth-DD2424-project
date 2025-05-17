@@ -67,22 +67,38 @@ class OxfordPetDataset(Dataset):
         return image, torch.tensor(label, dtype=label_dtype)
 
     @staticmethod
-    def _get_transforms():
+    def _get_transforms(data_augmentation=False):
         """
         Get image transformations for the Oxford Pet Dataset
+        Args:
+            data_augmentation: If True, returns transforms with augmentation for training
         Returns:
             transforms.Compose: Image transformations for ResNet50
         """
-        return transforms.Compose(
-            [
-                transforms.Resize(224),
-                transforms.CenterCrop(224),  # ResNet50 expects 224x224 input
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),  # ImageNet normalization
-            ]
-        )
+        if data_augmentation:
+            return transforms.Compose(
+                [
+                    transforms.Resize(256),  # Resize to slightly larger size
+                    transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),  # Random crop
+                    transforms.RandomHorizontalFlip(),  # Random horizontal flip
+                    transforms.RandomRotation(10),  # Random rotation up to 10 degrees
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    ),  # ImageNet normalization
+                ]
+            )
+        else:
+            return transforms.Compose(
+                [
+                    transforms.Resize(224),
+                    transforms.CenterCrop(224),  # ResNet50 expects 224x224 input
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    ),  # ImageNet normalization
+                ]
+            )
 
     @classmethod
     def get_dataloaders(
@@ -90,6 +106,7 @@ class OxfordPetDataset(Dataset):
         data_dir,
         batch_size=32,
         binary_classification=True,
+        data_augmentation=False,
         model_type="resnet",
         vit_model_name="google/vit-base-patch16-224",
     ):
@@ -132,9 +149,14 @@ class OxfordPetDataset(Dataset):
             binary_classification=binary_classification,
         )
 
+        dataset = OxfordPetDataset(
+            root_dir=data_dir,
+            transform=transform,
+            binary_classification=binary_classification,
+        )
+
         # Calculate split sizes
         total_size = len(dataset)
-        print(f"Total size of dataset: {total_size}")
         train_size = int(0.8 * total_size)
         val_size = int(0.1 * total_size)
         test_size = total_size - train_size - val_size
@@ -143,6 +165,10 @@ class OxfordPetDataset(Dataset):
         train_dataset, val_dataset, test_dataset = random_split(
             dataset, [train_size, val_size, test_size]
         )
+
+        if data_augmentation:
+            train_transform = cls.get_transforms(data_augmentation=True)
+            train_dataset.transform = train_transform
 
         # Create data loaders
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)

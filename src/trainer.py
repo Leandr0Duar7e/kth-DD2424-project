@@ -23,14 +23,37 @@ class ModelTrainer:
         model,
         device,
         binary_classification=True,
-        learning_rate=0.001,
+        learning_rate=[0.001],
+        lam=0.0,
         monitor_gradients=False,
         gradient_monitor_interval=100,
     ):
         self.model = model.to(device)
         self.device = device
         self.binary_classification = binary_classification
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+
+        param_groups = []
+
+        if len(learning_rate) == 1:
+            learning_rate = learning_rate[0]
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        else:
+            weighted_layers = self.model.get_index_weighted_layers()
+            weighted_layers.reverse()
+
+            backbone_layers = list(self.model.backbone.children())
+
+            for i in range(len(weighted_layers)):
+                param_groups.append(
+                    {
+                        "params": backbone_layers[weighted_layers[i]].parameters(),
+                        "lr": learning_rate[i],
+                        "weight_decay": lam,
+                    }
+                )
+
+            self.optimizer = torch.optim.Adam(param_groups)
+
         self.criterion = (
             nn.BCEWithLogitsLoss() if binary_classification else nn.CrossEntropyLoss()
         )
