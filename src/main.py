@@ -292,7 +292,6 @@ def run_experiment_vit_binary():
             print("Invalid input, using default interval 100.")
 
     # Create trainer
-    # Note: ViT models often benefit from smaller learning rates e.g. 5e-5 or 2e-5
     trainer = ModelTrainer(
         model,
         device,

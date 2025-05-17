@@ -6,7 +6,6 @@ from PIL import Image
 import pandas as pd
 import torch
 from transformers import AutoImageProcessor
-import torch.Generator
 
 
 class OxfordPetDataset(Dataset):
@@ -175,7 +174,7 @@ class OxfordPetDataset(Dataset):
         )
 
         # Prepare the final training dataset for the DataLoader
-        final_train_dataset = train_subset  # Default to the subset from the split
+        final_train_dataset = train_subset
 
         if data_augmentation and model_type == "resnet":
             print("\nApplying data augmentation to the ResNet training set...")
