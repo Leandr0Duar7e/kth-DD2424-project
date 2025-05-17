@@ -14,9 +14,19 @@ class ModelTrainer:
         device: The device to use for training (cuda or cpu)
         binary_classification: Whether the model is for binary classification
         learning_rate: Learning rate for the optimizer
+        monitor_gradients (bool): If True, logs gradient norms during training.
+        gradient_monitor_interval (int): Interval (in batches) for logging gradient norms.
     """
 
-    def __init__(self, model, device, binary_classification=True, learning_rate=0.001):
+    def __init__(
+        self,
+        model,
+        device,
+        binary_classification=True,
+        learning_rate=0.001,
+        monitor_gradients=False,
+        gradient_monitor_interval=100,
+    ):
         self.model = model.to(device)
         self.device = device
         self.binary_classification = binary_classification
@@ -30,6 +40,23 @@ class ModelTrainer:
             "val_loss": [],
             "val_acc": [],
         }
+        self.monitor_gradients = monitor_gradients
+        self.gradient_monitor_interval = gradient_monitor_interval
+
+    def _log_gradient_norms(self, epoch, batch_idx):
+        """Logs the L2 norm of gradients for each parameter and the total norm."""
+        print(f"--- Gradient Norms at Epoch {epoch+1}, Batch {batch_idx+1} ---")
+        total_norm = 0.0
+        for name, param in self.model.named_parameters():
+            if param.grad is not None and param.requires_grad:
+                param_norm = param.grad.norm(2).item()
+                total_norm += param_norm**2
+                print(f"  Param: {name:<50} | Grad Norm: {param_norm:.4e}")
+            elif param.requires_grad:
+                print(f"  Param: {name:<50} | Grad Norm: None (param.grad is None)")
+        total_norm = total_norm**0.5
+        print(f"  Total gradient norm for all trainable parameters: {total_norm:.4e}")
+        print(f"--- End of Gradient Norms ---")
 
     def evaluate(self, data_loader):
         """
@@ -104,7 +131,7 @@ class ModelTrainer:
             # Use tqdm for a progress bar
             progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}")
 
-            for inputs, labels in progress_bar:
+            for batch_idx, (inputs, labels) in enumerate(progress_bar):
                 inputs = inputs.to(self.device)
                 # Convert labels to appropriate type based on classification type
                 if self.binary_classification:
@@ -116,6 +143,14 @@ class ModelTrainer:
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs.squeeze(), labels)
                 loss.backward()
+
+                # Monitor gradient norms
+                if (
+                    self.monitor_gradients
+                    and (batch_idx + 1) % self.gradient_monitor_interval == 0
+                ):
+                    self._log_gradient_norms(epoch, batch_idx)
+
                 self.optimizer.step()
 
                 train_loss += loss.item()
@@ -261,7 +296,7 @@ class ModelTrainer:
                 train_loader, desc=f"Epoch {epoch+1}/{num_epochs} (Gradual Unfreeze)"
             )
 
-            for inputs, labels in progress_bar:
+            for batch_idx, (inputs, labels) in enumerate(progress_bar):
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 if self.binary_classification:
                     labels = labels.float()
@@ -272,6 +307,14 @@ class ModelTrainer:
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs.squeeze(), labels)
                 loss.backward()
+
+                # Monitor gradient norms
+                if (
+                    self.monitor_gradients
+                    and (batch_idx + 1) % self.gradient_monitor_interval == 0
+                ):
+                    self._log_gradient_norms(epoch, batch_idx)
+
                 self.optimizer.step()
 
                 train_loss += loss.item()

@@ -95,8 +95,28 @@ def run_experiment_1():
     # Get device
     device = get_device()
 
+    # Ask for gradient monitoring
+    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+    monitor_gradients = monitor_grads_choice == "y"
+    gradient_monitor_interval = 100  # Default
+    if monitor_gradients:
+        try:
+            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+            if interval > 0:
+                gradient_monitor_interval = interval
+            else:
+                print("Invalid interval, using default 100.")
+        except ValueError:
+            print("Invalid input, using default interval 100.")
+
     # Create trainer
-    trainer = ModelTrainer(model, device, binary_classification=True)
+    trainer = ModelTrainer(
+        model,
+        device,
+        binary_classification=True,
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
+    )
 
     # Display Swedish humor
     print(f"\n{get_swedish_waiting_message()}")
@@ -164,8 +184,28 @@ def run_experiment_2():
     # Get device
     device = get_device()
 
+    # Ask for gradient monitoring
+    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+    monitor_gradients = monitor_grads_choice == "y"
+    gradient_monitor_interval = 100  # Default
+    if monitor_gradients:
+        try:
+            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+            if interval > 0:
+                gradient_monitor_interval = interval
+            else:
+                print("Invalid interval, using default 100.")
+        except ValueError:
+            print("Invalid input, using default interval 100.")
+
     # Create trainer
-    trainer = ModelTrainer(model, device, binary_classification=False)
+    trainer = ModelTrainer(
+        model,
+        device,
+        binary_classification=False,
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
+    )
 
     # Display Swedish humor
     print(f"\n{get_swedish_waiting_message()}")
@@ -224,10 +264,29 @@ def run_experiment_vit_binary():
     # Get device
     device = get_device()
 
+    # Ask for gradient monitoring
+    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+    monitor_gradients = monitor_grads_choice == "y"
+    gradient_monitor_interval = 100  # Default
+    if monitor_gradients:
+        try:
+            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+            if interval > 0:
+                gradient_monitor_interval = interval
+            else:
+                print("Invalid interval, using default 100.")
+        except ValueError:
+            print("Invalid input, using default interval 100.")
+
     # Create trainer
     # Note: ViT models often benefit from smaller learning rates e.g. 5e-5 or 2e-5
     trainer = ModelTrainer(
-        model, device, binary_classification=True, learning_rate=5e-5
+        model,
+        device,
+        binary_classification=True,
+        learning_rate=5e-5,
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
     )
 
     # Display Swedish humor
@@ -283,9 +342,28 @@ def run_experiment_vit_multiclass():
     # Get device
     device = get_device()
 
+    # Ask for gradient monitoring
+    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+    monitor_gradients = monitor_grads_choice == "y"
+    gradient_monitor_interval = 100  # Default
+    if monitor_gradients:
+        try:
+            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+            if interval > 0:
+                gradient_monitor_interval = interval
+            else:
+                print("Invalid interval, using default 100.")
+        except ValueError:
+            print("Invalid input, using default interval 100.")
+
     # Create trainer
     trainer = ModelTrainer(
-        model, device, binary_classification=False, learning_rate=5e-5
+        model,
+        device,
+        binary_classification=False,
+        learning_rate=5e-5,
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
     )
 
     # Display Swedish humor
