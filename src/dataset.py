@@ -117,6 +117,7 @@ class OxfordPetDataset(Dataset):
             data_dir: Path to the dataset directory
             batch_size: Batch size for the dataloaders
             binary_classification: If True, convert labels to binary (dog=1, cat=0)
+            data_augmentation: If True, applies augmentation to the training set (ResNet only)
             model_type (str): "resnet" or "vit". Determines preprocessing.
             vit_model_name (str): Hugging Face model name if model_type is "vit".
 
@@ -138,42 +139,58 @@ class OxfordPetDataset(Dataset):
                 images=pil_img, return_tensors="pt"
             )["pixel_values"].squeeze(0)
         elif model_type == "resnet":
-            print("\nUsing ResNet image transforms...")
-            current_transform = cls._get_transforms()
+            print(
+                "\nUsing ResNet image transforms (initially non-augmented for split)..."
+            )
+            # Base transform for the dataset to be split (val/test will use this)
+            current_transform = cls._get_transforms(data_augmentation=False)
         else:
             raise ValueError(f"Unsupported model_type: {model_type}")
 
-        dataset = cls(
+        # Main dataset object using the determined transform (non-augmented for ResNet here)
+        # This dataset instance will be used by val_dataset and test_dataset subsets.
+        dataset_for_splitting = cls(
             root_dir=data_dir,
-            transform=current_transform,  # Pass the selected transform/processor
-            binary_classification=binary_classification,
-        )
-
-        dataset = OxfordPetDataset(
-            root_dir=data_dir,
-            transform=transform,
+            transform=current_transform,
             binary_classification=binary_classification,
         )
 
         # Calculate split sizes
-        total_size = len(dataset)
+        total_size = len(dataset_for_splitting)
+        print(f"Total size of dataset: {total_size}")
         train_size = int(0.8 * total_size)
         val_size = int(0.1 * total_size)
         test_size = total_size - train_size - val_size
 
         # Split into train, validation and test sets (80-10-10 split)
-        train_dataset, val_dataset, test_dataset = random_split(
-            dataset, [train_size, val_size, test_size]
+        # These are Subset objects pointing to dataset_for_splitting
+        train_subset, val_subset, test_subset = random_split(
+            dataset_for_splitting, [train_size, val_size, test_size]
         )
 
-        if data_augmentation:
-            train_transform = cls.get_transforms(data_augmentation=True)
-            train_dataset.transform = train_transform
+        # Prepare the final training dataset for the DataLoader
+        final_train_dataset = train_subset  # Default to the subset from the split
+
+        if data_augmentation and model_type == "resnet":
+            print("\nApplying data augmentation to the ResNet training set...")
+            # Create a new OxfordPetDataset instance with augmented transforms
+            augmented_dataset_source = cls(
+                root_dir=data_dir,
+                transform=cls._get_transforms(data_augmentation=True),
+                binary_classification=binary_classification,
+            )
+            # Create a new Subset using the indices from the original train_subset,
+            # but pointing to the newly created augmented_dataset_source.
+            final_train_dataset = torch.utils.data.Subset(
+                augmented_dataset_source, train_subset.indices
+            )
 
         # Create data loaders
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(
+            final_train_dataset, batch_size=batch_size, shuffle=True
+        )
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
         num_classes = 1 if binary_classification else 37
         return train_loader, val_loader, test_loader, num_classes
