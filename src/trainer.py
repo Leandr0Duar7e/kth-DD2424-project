@@ -90,7 +90,7 @@ class ModelTrainer:
 
         return total_loss / len(data_loader), 100 * correct_pred / n_sample
 
-    def train(self, train_loader, val_loader, num_epochs=10, learning_rate=0.001, print_graph=False):
+    def train(self, train_loader, val_loader, num_epochs=10, print_graph=False):
         """
         Train the model
 
