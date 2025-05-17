@@ -255,8 +255,8 @@ def run_experiment_vit_binary():
     print("=" * 70)
 
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = 3  # Example, can be configured
-    batch_size_vit = 32  # Adjust based on GPU memory
+    num_epochs_vit = 3  # can be configured
+    batch_size_vit = 32
 
     # Load data
     train_loader, val_loader, test_loader, _ = OxfordPetDataset.get_dataloaders(
@@ -297,7 +297,7 @@ def run_experiment_vit_binary():
         model,
         device,
         binary_classification=True,
-        learning_rate=5e-5,
+        learning_rate=[5e-5],
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
     )
@@ -374,7 +374,7 @@ def run_experiment_vit_multiclass():
         model,
         device,
         binary_classification=False,
-        learning_rate=5e-5,
+        learning_rate=[5e-5],
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
     )
