@@ -365,27 +365,37 @@ class ModelTrainer:
             print(f"Plot saved to {plot_filename}")
         plt.close(fig)  # Close the figure to free memory
 
-    def save_model(self, model_type="binary"):
+    def save_model(self, model_type="binary", model_architecture="resnet"):
         """
         Save the trained model
 
         Args:
-            model_type: Type of model ('binary', 'multiclass', or 'pretrained')
+            model_type: Type of model ('binary', 'multiclass')
+            model_architecture: Architecture of the model ('resnet', 'vit')
         """
         # Create the directory if it doesn't exist
-        base_dir = "../models/resnet"
+        base_dir = os.path.join(
+            "..", "models", model_architecture
+        )  # Use os.path.join for robustness
         save_dir = os.path.join(base_dir, model_type)
         os.makedirs(save_dir, exist_ok=True)
 
         # Save the model
+        model_filename = f"{model_architecture}_{model_type}_classifier.pth"
+        save_path = os.path.join(save_dir, model_filename)
         torch.save(
             {
                 "model_state_dict": self.model.state_dict(),
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "history": self.history,
                 "binary_classification": self.binary_classification,
+                # Optionally save model_architecture and model_type if needed for loading
+                "model_architecture": model_architecture,
+                "model_name_or_path": getattr(
+                    self.model, "model_name_or_path", None
+                ),  # Save if ViT model
             },
-            os.path.join(save_dir, f"resnet50_{model_type}_classifier.pth"),
+            save_path,
         )
 
-        print(f"Model saved to {save_dir}/resnet50_{model_type}_classifier.pth")
+        print(f"Model saved to {save_path}")

@@ -5,6 +5,7 @@ import os
 from PIL import Image
 import pandas as pd
 import torch
+from transformers import AutoImageProcessor
 
 
 class OxfordPetDataset(Dataset):
@@ -60,7 +61,10 @@ class OxfordPetDataset(Dataset):
         if self.transform:
             image = self.transform(image)
 
-        return image, torch.tensor(label, dtype=torch.float32)
+        # Determine label dtype based on classification type and model target
+        # BCEWithLogitsLoss (binary) expects float labels. CrossEntropyLoss (multi-class) expects long labels.
+        label_dtype = torch.float32 if self.binary_classification else torch.long
+        return image, torch.tensor(label, dtype=label_dtype)
 
     @staticmethod
     def _get_transforms():
@@ -81,7 +85,14 @@ class OxfordPetDataset(Dataset):
         )
 
     @classmethod
-    def get_dataloaders(cls, data_dir, batch_size=32, binary_classification=True):
+    def get_dataloaders(
+        cls,
+        data_dir,
+        batch_size=32,
+        binary_classification=True,
+        model_type="resnet",
+        vit_model_name="google/vit-base-patch16-224",
+    ):
         """
         Get train, validation and test dataloaders for the Oxford Pet Dataset
 
@@ -89,6 +100,8 @@ class OxfordPetDataset(Dataset):
             data_dir: Path to the dataset directory
             batch_size: Batch size for the dataloaders
             binary_classification: If True, convert labels to binary (dog=1, cat=0)
+            model_type (str): "resnet" or "vit". Determines preprocessing.
+            vit_model_name (str): Hugging Face model name if model_type is "vit".
 
         Returns:
             train_loader: DataLoader for training data (80% of dataset)
@@ -96,10 +109,26 @@ class OxfordPetDataset(Dataset):
             test_loader: DataLoader for test data (10% of dataset)
             num_classes: Number of classes (1 for binary, 37 for multi-class)
         """
-        transform = cls._get_transforms()
+        current_transform = None
+        if model_type == "vit":
+            if not vit_model_name:
+                raise ValueError("vit_model_name must be provided for ViT model type")
+            print(f"\nUsing ViT image processor for {vit_model_name}...")
+            image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
+            # The transform will take a PIL image and return processed pixel_values tensor
+            # Squeeze(0) removes the batch dimension added by default by the processor when processing a single image.
+            current_transform = lambda pil_img: image_processor(
+                images=pil_img, return_tensors="pt"
+            )["pixel_values"].squeeze(0)
+        elif model_type == "resnet":
+            print("\nUsing ResNet image transforms...")
+            current_transform = cls._get_transforms()
+        else:
+            raise ValueError(f"Unsupported model_type: {model_type}")
+
         dataset = cls(
             root_dir=data_dir,
-            transform=transform,
+            transform=current_transform,  # Pass the selected transform/processor
             binary_classification=binary_classification,
         )
 
