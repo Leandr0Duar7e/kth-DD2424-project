@@ -108,6 +108,10 @@ def run_experiment_1():
                 print("Invalid interval, using default 100.")
         except ValueError:
             print("Invalid input, using default interval 100.")
+            
+    # Ask for batch normalization fine-tuning
+    finetune_bn_choice = input("\nDo you want to fine-tune batch normalization parameters? (y/n): ").lower()
+    finetune_bn = finetune_bn_choice == "y"
 
     # Create trainer
     trainer = ModelTrainer(
@@ -116,6 +120,7 @@ def run_experiment_1():
         binary_classification=True,
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
+        finetune_bn=finetune_bn,
     )
 
     # Display Swedish humor
@@ -149,7 +154,7 @@ def run_experiment_2():
     # Get number of layers to train
     user_input = int(
         input(
-            "\nSelect training option: \n n>0: train n layers \n '-1': gradually unfreeze each layer \n '-2': different learning rate for each layer and no data augmentation \n '-3': different learning rates for each layer and data augmentation"
+            "\nSelect training option: \n n>0: train n layers \n '-1': gradually unfreeze each layer \n '-2': different learning rate for each layer and no data augmentation \n '-3': different learning rates for each layer and data augmentation \n User input: "
         )
     )
 
@@ -203,12 +208,16 @@ def run_experiment_2():
                 print("Invalid interval, using default 100.")
         except ValueError:
             print("Invalid input, using default interval 100.")
+            
+    # Ask for batch normalization fine-tuning
+    finetune_bn_choice = input("\nDo you want to fine-tune batch normalization parameters? (y/n): ").lower()
+    finetune_bn = finetune_bn_choice == "y"
 
     # Create trainer
     if user_input == -2 or user_input == -3:  # Different learning rates for each layer
         learning_rates = [1e-3, 5e-4, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7, 5e-8]
     else:
-        learning_rates = [0.001]
+        learning_rates = [0.00001]
     trainer = ModelTrainer(
         model,
         device,
@@ -216,6 +225,7 @@ def run_experiment_2():
         learning_rate=learning_rates,
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
+        finetune_bn=finetune_bn,
     )
 
     # Display Swedish humor
@@ -225,11 +235,10 @@ def run_experiment_2():
     if user_input == -1:
         print("\nStarting training with Gradual Unfreezing...")
         model, history = trainer.train_gradual_unfreezing(
-            train_loader, val_loader, num_epochs=3, print_graph=True
+            train_loader, val_loader, num_epochs=2, print_graph=True
         )
     else:
 
-        # TODO: ADD LEARNING RATES
         model, history = trainer.train(
             train_loader, val_loader, num_epochs=3, print_graph=True
         )
@@ -290,6 +299,10 @@ def run_experiment_vit_binary():
                 print("Invalid interval, using default 100.")
         except ValueError:
             print("Invalid input, using default interval 100.")
+            
+    # Ask for batch normalization fine-tuning
+    finetune_bn_choice = input("\nDo you want to fine-tune batch normalization parameters? (y/n): ").lower()
+    finetune_bn = finetune_bn_choice == "y"
 
     # Create trainer
     # Note: ViT models often benefit from smaller learning rates e.g. 5e-5 or 2e-5
@@ -300,6 +313,7 @@ def run_experiment_vit_binary():
         learning_rate=5e-5,
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
+        finetune_bn=finetune_bn,
     )
 
     # Display Swedish humor
@@ -368,6 +382,10 @@ def run_experiment_vit_multiclass():
                 print("Invalid interval, using default 100.")
         except ValueError:
             print("Invalid input, using default interval 100.")
+            
+    # Ask for batch normalization fine-tuning
+    finetune_bn_choice = input("\nDo you want to fine-tune batch normalization parameters? (y/n): ").lower()
+    finetune_bn = finetune_bn_choice == "y"
 
     # Create trainer
     trainer = ModelTrainer(
@@ -377,6 +395,7 @@ def run_experiment_vit_multiclass():
         learning_rate=5e-5,
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
+        finetune_bn=finetune_bn,
     )
 
     # Display Swedish humor
