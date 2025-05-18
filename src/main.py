@@ -86,20 +86,11 @@ def run_experiment_1():
             f"Dataset loaded successfully! ({len(train_loader.dataset)} training samples)"
         )
 
-        # Get number of layers to train
-        num_layers = int(
-            input("\nInsert the number of layers to train (last layer excluded): ")
-        )
-
         # Load model
         print("\nInitializing ResNet50 model...")
         for _ in tqdm(range(5), desc="Loading model"):
             time.sleep(0.5)  # Simulate loading time
-        model = ResNet50(
-            binary_classification=True,
-            freeze_backbone=True,
-            num_train_layers=num_layers,
-        )
+        model = ResNet50(binary_classification=True, freeze_backbone=True)
 
         # Get device
         device = get_device()
@@ -127,6 +118,7 @@ def run_experiment_1():
             model,
             device,
             binary_classification=True,
+            learning_rate=[0.001],
             monitor_gradients=monitor_gradients,
             gradient_monitor_interval=gradient_monitor_interval,
         )
@@ -556,11 +548,11 @@ def run_experiment_vit_binary():
             except ValueError:
                 print("Invalid input, using default interval 100.")
 
-        # Ask for batch normalization fine-tuning
-        finetune_bn_choice = input(
-            "\nDo you want to fine-tune batch normalization parameters? (y/n): "
-        ).lower()
-        finetune_bn = finetune_bn_choice == "y"
+        # # Ask for batch normalization fine-tuning
+        # finetune_bn_choice = input(
+        #     "\nDo you want to fine-tune batch normalization parameters? (y/n): "
+        # ).lower()
+        # finetune_bn = finetune_bn_choice == "y"
 
         # Create trainer
         # Note: ViT models often benefit from smaller learning rates e.g. 5e-5 or 2e-5
@@ -571,7 +563,6 @@ def run_experiment_vit_binary():
             learning_rate=[5e-5],
             monitor_gradients=monitor_gradients,
             gradient_monitor_interval=gradient_monitor_interval,
-            finetune_bn=finetune_bn,
         )
 
         # Display Swedish humor
@@ -645,11 +636,11 @@ def run_experiment_vit_multiclass():
         except ValueError:
             print("Invalid input, using default interval 100.")
 
-    # Ask for batch normalization fine-tuning
-    finetune_bn_choice = input(
-        "\nDo you want to fine-tune batch normalization parameters? (y/n): "
-    ).lower()
-    finetune_bn = finetune_bn_choice == "y"
+    # # Ask for batch normalization fine-tuning
+    # finetune_bn_choice = input(
+    #     "\nDo you want to fine-tune batch normalization parameters? (y/n): "
+    # ).lower()
+    # finetune_bn = finetune_bn_choice == "y"
 
     # Create trainer
     trainer = ModelTrainer(
@@ -659,7 +650,6 @@ def run_experiment_vit_multiclass():
         learning_rate=[5e-5],
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
-        finetune_bn=finetune_bn,
     )
 
     # Display Swedish humor

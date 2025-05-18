@@ -463,7 +463,7 @@ def main():
     # Project root is one level up from src where this script is
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    DATA_DIR = os.path.join(project_root, "data", "raw", "oxford-iiit-pet")
+    DATA_DIR = os.path.join(project_root, "data", "raw")
     MODELS_ROOT_DIR = os.path.join(project_root, "models")
     EVALUATION_ROOT_DIR = os.path.join(project_root, "evaluation")
 
