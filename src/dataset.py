@@ -173,7 +173,7 @@ class OxfordPetDataset(Dataset):
         train_subset, val_subset, test_subset = random_split(
             dataset_for_splitting,
             [train_size, val_size, test_size],
-            generator=generator,
+            generator=generatgit checkout mainor,
         )
 
         # Prepare the final training dataset for the DataLoader
