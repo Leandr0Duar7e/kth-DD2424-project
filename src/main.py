@@ -246,6 +246,11 @@ def run_experiment_imbalanced_multiclass():
 
     strategy = int(input("Choose strategy (1/2/3): ").strip())
 
+    user_input = int(
+                input(
+                    "\nInsert the number of layers to train (last layer excluded): "
+                )
+            )
     # Load imbalanced data
     train_loader, val_loader, test_loader, num_classes = OxfordPetDataset.get_dataloaders(
         data_dir="../data/raw",
@@ -263,7 +268,7 @@ def run_experiment_imbalanced_multiclass():
     print("\nInitializing ResNet50 model...")
     for _ in tqdm(range(5), desc="Loading model"):
         time.sleep(0.2)
-    model = ResNet50(binary_classification=False, freeze_backbone=True, num_train_layers=2)
+    model = ResNet50(binary_classification=False, freeze_backbone=True, num_train_layers=user_input)
 
     device = get_device()
 
