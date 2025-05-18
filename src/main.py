@@ -89,15 +89,8 @@ def run_experiment_1():
         # Load model
         print("\nInitializing ResNet50 model...")
         for _ in tqdm(range(5), desc="Loading model"):
-<<<<<<< HEAD
-            time.sleep(0.5)  # Simulate loading time
-        model = ResNet50(binary_classification=True, freeze_backbone=True)
-=======
             time.sleep(0.2)  # Simulate loading time
-        model = ResNet50(
-            binary_classification=True, freeze_backbone=True, num_train_layers=num_layers
-        )
->>>>>>> main
+        model = ResNet50(binary_classification=True, freeze_backbone=True)
 
         # Get device
         device = get_device()
@@ -267,15 +260,14 @@ def run_experiment_2_semi_supervised():
     for _ in tqdm(range(5), desc="Loading model"):
         time.sleep(0.2)  # Simulate loading time
 
-
     if user_input == -2 or user_input == -3:
-    
+
         model = ResNet50(
             binary_classification=False,
-            freeze_backbone=False, 
+            freeze_backbone=False,
             num_train_layers=0,
         )
-        
+
     else:
 
         # Freeze all layers except the selected ones
@@ -332,13 +324,6 @@ def run_experiment_2_semi_supervised():
             labeled_loader, val_loader, num_epochs=3, print_graph=True
         )
 
-<<<<<<< HEAD
-        # print("\nStarting training with Gradual Unfreezing...")
-        # model, history = trainer.train_gradual_unfreezing(
-        #     train_loader, val_loader, num_epochs=2, print_graph=True
-        # )
-=======
->>>>>>> main
     else:
 
         model, history = trainer.train(
@@ -421,10 +406,10 @@ def run_experiment_2():
             # All layers unfrozen
             model = ResNet50(
                 binary_classification=False,
-                freeze_backbone=False, 
-                num_train_layers=0,  
+                freeze_backbone=False,
+                num_train_layers=0,
             )
-            
+
         else:
             model = ResNet50(
                 binary_classification=False,
@@ -441,7 +426,7 @@ def run_experiment_2():
         ).lower()
         monitor_gradients = monitor_grads_choice == "y"
         gradient_monitor_interval = 100  # Default
-        
+
         if monitor_gradients:
             try:
                 interval = int(
@@ -454,9 +439,10 @@ def run_experiment_2():
             except ValueError:
                 print("Invalid input, using default interval 100.")
 
-
         # Ask for batch normalization fine-tuning
-        finetune_bn_choice = input("\nDo you want to fine-tune batch normalization parameters? (y/n): ").lower()
+        finetune_bn_choice = input(
+            "\nDo you want to fine-tune batch normalization parameters? (y/n): "
+        ).lower()
         finetune_bn = finetune_bn_choice == "y"
 
         # Create trainer
@@ -477,7 +463,7 @@ def run_experiment_2():
             ]
         else:
             learning_rates = [5e-5]
-            
+
         trainer = ModelTrainer(
             model,
             device,
@@ -493,12 +479,12 @@ def run_experiment_2():
 
         # Train model
         if user_input == -1:
-            
+
             model, history = trainer.train_gradual_unfreezing(
                 train_loader, val_loader, num_epochs=1, print_graph=True
             )
         else:
-            
+
             model, history = trainer.train(
                 train_loader, val_loader, num_epochs=1, print_graph=True
             )
@@ -606,24 +592,14 @@ def run_experiment_vit_binary():
         print("\nFinal Test Results (ViT Binary):")
         print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.4f}%")
     elif choice == "2":
-<<<<<<< HEAD
-        # run_experiment_vit_binary_semi()
-        print("Add")
-=======
         run_experiment_vit_binary_semi()
->>>>>>> main
     else:
         print("Invalid option.")
     print("\nViT Binary Experiment completed!")
 
-<<<<<<< HEAD
 
-def run_experiment_vit_multiclass():
-    """Run ViT multi-class classification experiment"""
-=======
 def run_experiment_vit_binary_semi():
     """Run ViT binary classification experiment"""
->>>>>>> main
     print("\n" + "=" * 70)
     print("Starting experiment 3: ViT binary classification (Dog vs Cat)")
     print("=" * 70)
@@ -631,16 +607,18 @@ def run_experiment_vit_binary_semi():
     vit_model_checkpoint = "google/vit-base-patch16-224"
     num_epochs_vit = 3  # can be configured
     batch_size_vit = 32
-    
+
     label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
-    
-    labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
+
+    labeled_loader, unlabeled_loader, val_loader, test_loader = (
+        OxfordPetDataset.get_semi_supervised_loaders(
             data_dir="../data/raw",
             batch_size=32,
             label_fraction=label_fraction,
             binary_classification=True,
             model_type="vit",
-            vit_model_name=vit_model_checkpoint,    
+            vit_model_name=vit_model_checkpoint,
+        )
     )
 
     # Load model
@@ -685,8 +663,9 @@ def run_experiment_vit_binary_semi():
 
     # Train model
     model, _ = trainer.train(
-        labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True)
-    
+        labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
+    )
+
     print("\nGenerating pseudo-labels...")
     pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
 
@@ -700,90 +679,94 @@ def run_experiment_vit_binary_semi():
     test_loss, test_acc = trainer.evaluate(test_loader)
     print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
 
-def run_experiment_vit_multiclass_semi():
-        vit_model_checkpoint = "google/vit-base-patch16-224"
-        num_epochs_vit = (
-            3  # Example, can be configured. More epochs might be needed for multi-class.
-        )
-        batch_size_vit = 32  # Adjust based on GPU memory
 
-        label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
-        
-        labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
+def run_experiment_vit_multiclass_semi():
+    vit_model_checkpoint = "google/vit-base-patch16-224"
+    num_epochs_vit = (
+        3  # Example, can be configured. More epochs might be needed for multi-class.
+    )
+    batch_size_vit = 32  # Adjust based on GPU memory
+
+    label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
+
+    labeled_loader, unlabeled_loader, val_loader, test_loader = (
+        OxfordPetDataset.get_semi_supervised_loaders(
             data_dir="../data/raw",
             batch_size=batch_size_vit,
             binary_classification=False,
             model_type="vit",
-            vit_model_name=vit_model_checkpoint,  
+            vit_model_name=vit_model_checkpoint,
         )
+    )
 
-        # Load model
-        print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
-        model = ViT(model_name_or_path=vit_model_checkpoint, binary_classification=False)
+    # Load model
+    print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
+    model = ViT(model_name_or_path=vit_model_checkpoint, binary_classification=False)
 
-        # Get device
-        device = get_device()
+    # Get device
+    device = get_device()
 
-        # Ask for gradient monitoring
-        monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
-        monitor_gradients = monitor_grads_choice == "y"
-        gradient_monitor_interval = 100  # Default
-        if monitor_gradients:
-            try:
-                interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
-                if interval > 0:
-                    gradient_monitor_interval = interval
-                else:
-                    print("Invalid interval, using default 100.")
-            except ValueError:
-                print("Invalid input, using default interval 100.")
+    # Ask for gradient monitoring
+    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+    monitor_gradients = monitor_grads_choice == "y"
+    gradient_monitor_interval = 100  # Default
+    if monitor_gradients:
+        try:
+            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+            if interval > 0:
+                gradient_monitor_interval = interval
+            else:
+                print("Invalid interval, using default 100.")
+        except ValueError:
+            print("Invalid input, using default interval 100.")
 
-        # Create trainer
-        trainer = ModelTrainer(
-            model,
-            device,
-            binary_classification=False,
-            learning_rate=[5e-5],
-            monitor_gradients=monitor_gradients,
-            gradient_monitor_interval=gradient_monitor_interval,
-        )
+    # Create trainer
+    trainer = ModelTrainer(
+        model,
+        device,
+        binary_classification=False,
+        learning_rate=[5e-5],
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
+    )
 
-        # Display Swedish humor
-        print(f"\n{get_swedish_waiting_message()}")
+    # Display Swedish humor
+    print(f"\n{get_swedish_waiting_message()}")
 
-        # Train model
-        # For multi-class ViT, gradual unfreezing could be explored later if needed.
-        # For now, standard fine-tuning.
-        model, history = trainer.train(
-            labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
-        )
+    # Train model
+    # For multi-class ViT, gradual unfreezing could be explored later if needed.
+    # For now, standard fine-tuning.
+    model, history = trainer.train(
+        labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
+    )
 
-        print("\nGenerating pseudo-labels...")
-        pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
+    print("\nGenerating pseudo-labels...")
+    pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
 
-        print("\nTraining on combined labeled + pseudo-labeled data...")
-        combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
+    print("\nTraining on combined labeled + pseudo-labeled data...")
+    combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
 
-        model, _ = trainer.train(
-            combined_loader, val_loader, num_epochs=3, print_graph=True
-        )
-        print("\nEvaluating final model on test set...")
-        test_loss, test_acc = trainer.evaluate(test_loader)
-        print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
+    model, _ = trainer.train(
+        combined_loader, val_loader, num_epochs=3, print_graph=True
+    )
+    print("\nEvaluating final model on test set...")
+    test_loss, test_acc = trainer.evaluate(test_loader)
+    print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
 
-        # Save model
-        save_choice = input("\nDo you want to save the model? (y/n): ").lower()
-        if save_choice == "y":
-            trainer.save_model(model_type="multiclass", model_architecture="vit")
+    # Save model
+    save_choice = input("\nDo you want to save the model? (y/n): ").lower()
+    if save_choice == "y":
+        trainer.save_model(model_type="multiclass", model_architecture="vit")
 
-        # Evaluate on test set
-        print("\nEvaluating ViT model on test set...")
-        test_loss, test_acc = trainer.evaluate(test_loader)
-        print("\nFinal Test Results (ViT Multi-class):")
-        print(
-            f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%"
-        )  # .2f for multiclass as in run_exp2 
-    
+    # Evaluate on test set
+    print("\nEvaluating ViT model on test set...")
+    test_loss, test_acc = trainer.evaluate(test_loader)
+    print("\nFinal Test Results (ViT Multi-class):")
+    print(
+        f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%"
+    )  # .2f for multiclass as in run_exp2
+
+
 def run_experiment_vit_multiclass():
     """Run ViT multi-class classification experiment"""
     print("\n" + "=" * 70)
@@ -793,9 +776,7 @@ def run_experiment_vit_multiclass():
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
         vit_model_checkpoint = "google/vit-base-patch16-224"
-        num_epochs_vit = (
-            3  # Example, can be configured. More epochs might be needed for multi-class.
-        )
+        num_epochs_vit = 3  # Example, can be configured. More epochs might be needed for multi-class.
         batch_size_vit = 32  # Adjust based on GPU memory
 
         # Load data
@@ -812,18 +793,24 @@ def run_experiment_vit_multiclass():
 
         # Load model
         print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
-        model = ViT(model_name_or_path=vit_model_checkpoint, binary_classification=False)
+        model = ViT(
+            model_name_or_path=vit_model_checkpoint, binary_classification=False
+        )
 
         # Get device
         device = get_device()
 
         # Ask for gradient monitoring
-        monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+        monitor_grads_choice = input(
+            "\nDo you want to monitor gradients? (y/n): "
+        ).lower()
         monitor_gradients = monitor_grads_choice == "y"
         gradient_monitor_interval = 100  # Default
         if monitor_gradients:
             try:
-                interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+                interval = int(
+                    input("Monitor gradients every N batches (e.g., 50, 100): ")
+                )
                 if interval > 0:
                     gradient_monitor_interval = interval
                 else:
@@ -868,6 +855,7 @@ def run_experiment_vit_multiclass():
     else:
         print("Invalid option.")
     print("\nViT Multi-class Experiment completed!")
+
 
 def main():
     """Main function"""

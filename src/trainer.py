@@ -53,22 +53,9 @@ class ModelTrainer:
                 finetune_bn=finetune_bn
             )
             weighted_layers.reverse()
-<<<<<<< HEAD
-
-            print(f"Weighted layers: {weighted_layers}")
 
             backbone_layers = list(self.model.backbone.children())
 
-            # non_weighted_layers = [i for i in range(len(backbone_layers)) if i not in weighted_layers]
-            # print(f"Non-weighted layers: {non_weighted_layers}")
-
-            # self.layer_learning_rates = {}
-=======
-            
-
-            backbone_layers = list(self.model.backbone.children())
-            
->>>>>>> main
             param_groups = []
 
             for i in range(len(backbone_layers)):
@@ -115,18 +102,12 @@ class ModelTrainer:
                 module.eval()  # Set BN layers to evaluation mode
 
                 for param in module.parameters():
-<<<<<<< HEAD
                     param.requires_grad = False
 
-=======
-                    param.requires_grad = False            
-                     
             for name, param in module.named_parameters():
                 if "bn" in name:
                     param.requires_grad = False
-                
-                    
->>>>>>> main
+
     def _log_gradient_norms(self, epoch, batch_idx):
         """Logs the L2 norm of gradients for each parameter and the total norm."""
         print(f"--- Gradient Norms at Epoch {epoch+1}, Batch {batch_idx+1} ---")
@@ -339,21 +320,26 @@ class ModelTrainer:
         }
 
         tot_num_steps = len(train_loader) * num_epochs
-        
+
         # Identify layers in the backbone (excluding the final classifier layer)
         if hasattr(self.model, "backbone") and self.model.backbone is not None:
-            
-            all_layers_in_backbone = list(self.model.backbone.children())[:-1]  # Exclude the final fc layer
 
-            param_layers_indices = self.model.get_index_weighted_layers(self.finetune_bn)[:-1]
-            
+            all_layers_in_backbone = list(self.model.backbone.children())[
+                :-1
+            ]  # Exclude the final fc layer
+
+            param_layers_indices = self.model.get_index_weighted_layers(
+                self.finetune_bn
+            )[:-1]
+
             actual_param_layers = []
-            
+
             for i in param_layers_indices:
                 actual_param_layers.append(all_layers_in_backbone[i])
-            
 
-            print(f"Identified {len(actual_param_layers)} parameter-containing layer groups in backbone to unfreeze gradually (fc already unfrozen).")
+            print(
+                f"Identified {len(actual_param_layers)} parameter-containing layer groups in backbone to unfreeze gradually (fc already unfrozen)."
+            )
 
             if (
                 not actual_param_layers or len(actual_param_layers) <= 1
@@ -376,9 +362,9 @@ class ModelTrainer:
                 for param in layer_module.parameters():
                     param.requires_grad = False
 
-            unfreeze_step_interval = tot_num_steps // (len(
-                actual_param_layers
-            ) + 1)   # unfreeze one layer group per interval
+            unfreeze_step_interval = tot_num_steps // (
+                len(actual_param_layers) + 1
+            )  # unfreeze one layer group per interval
             unfreeze_layer_group_idx_to_unfreeze = (
                 len(actual_param_layers) - 1
             )  # Start from the layer group closest to classifier
@@ -396,19 +382,10 @@ class ModelTrainer:
             else:
                 # If not fine-tuning BN, we need to set the model to train mode but keep BN in eval mode
                 self.model.train()
-                
-                # Re-freeze BN layers as model.train() would have set them to train mode
-<<<<<<< HEAD
-                for module in self.model.modules():
-                    if isinstance(module, nn.BatchNorm2d) or isinstance(
-                        module, nn.BatchNorm1d
-                    ):
-                        module.eval()
 
-=======
+                # Re-freeze BN layers as model.train() would have set them to train mode
                 self._freeze_bn_params()
-                        
->>>>>>> main
+
             train_loss = 0.0
             train_correct = 0
             train_total = 0
