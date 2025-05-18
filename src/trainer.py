@@ -3,7 +3,7 @@ import torch.nn as nn
 import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-
+from torch.utils.data import DataLoader, ConcatDataset
 
 class ModelTrainer:
     """
@@ -120,6 +120,16 @@ class ModelTrainer:
         print(f"  Total gradient norm for all trainable parameters: {total_norm:.4e}")
         print(f"--- End of Gradient Norms ---")
 
+    def combine_loaders(self, labeled_loader, pseudo_loader):
+        """
+        Combine labeled and pseudo-labeled data into one DataLoader
+        """
+        combined_dataset = ConcatDataset([
+            labeled_loader.dataset,
+            pseudo_loader.dataset
+        ])
+        return DataLoader(combined_dataset, batch_size=32, shuffle=True)
+    
     def evaluate(self, data_loader):
         """
         Evaluate the model on a dataset
@@ -470,6 +480,33 @@ class ModelTrainer:
 
         return self.model, self.history
 
+    def generate_pseudo_labels(self, model, unlabeled_loader):
+        """
+        Generate pseudo-labels for unlabeled data
+        """
+        model.eval()
+        pseudo_images, pseudo_labels = [], []
+
+        with torch.no_grad():
+            for images, _ in unlabeled_loader:
+                images = images.to(self.device)
+                outputs = model(images)
+
+                preds = (
+                    (torch.sigmoid(outputs) > 0.5).float().squeeze()
+                    if self.binary_classification
+                    else outputs.argmax(dim=1)
+                )
+
+                pseudo_images.extend(images.cpu())
+                pseudo_labels.extend(preds.cpu())
+
+        dataset = torch.utils.data.TensorDataset(
+            torch.stack(pseudo_images),
+            torch.tensor(pseudo_labels, dtype=torch.float32 if self.binary_classification else torch.long),
+        )
+        return DataLoader(dataset, batch_size=32, shuffle=True)
+    
     def _plot_history(self):
         if not self.history["train_loss"]:  # Check if history is empty
             print("No training history to plot.")
