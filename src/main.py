@@ -92,19 +92,25 @@ def run_experiment_1():
         for _ in tqdm(range(5), desc="Loading model"):
             time.sleep(0.5)  # Simulate loading time
         model = ResNet50(
-            binary_classification=True, freeze_backbone=True, num_train_layers=num_layers
+            binary_classification=True,
+            freeze_backbone=True,
+            num_train_layers=num_layers,
         )
 
         # Get device
         device = get_device()
-        
+
         # Ask for gradient monitoring
-        monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+        monitor_grads_choice = input(
+            "\nDo you want to monitor gradients? (y/n): "
+        ).lower()
         monitor_gradients = monitor_grads_choice == "y"
         gradient_monitor_interval = 100  # Default
         if monitor_gradients:
             try:
-                interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+                interval = int(
+                    input("Monitor gradients every N batches (e.g., 50, 100): ")
+                )
                 if interval > 0:
                     gradient_monitor_interval = interval
                 else:
@@ -146,23 +152,30 @@ def run_experiment_1():
     else:
         print("Invalid option.")
 
+
 def run_experiment_1_semi_supervised():
     print("\nRunning semi-supervised experiment (binary classification)...")
 
-    num_layers = int(input("Insert the number of layers to train (last layer excluded): "))
-    
+    num_layers = int(
+        input("Insert the number of layers to train (last layer excluded): ")
+    )
+
     label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
-    labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
-        data_dir="../data/raw",
-        batch_size=32,
-        label_fraction=label_fraction,
-        binary_classification=True,
+    labeled_loader, unlabeled_loader, val_loader, test_loader = (
+        OxfordPetDataset.get_semi_supervised_loaders(
+            data_dir="../data/raw",
+            batch_size=32,
+            label_fraction=label_fraction,
+            binary_classification=True,
+        )
     )
     print(
         f"Dataset loaded successfully! ({len(labeled_loader.dataset)} labeled samples and {len(unlabeled_loader.dataset)} unlabeled samples)"
-        )
+    )
 
-    model = ResNet50(binary_classification=True, freeze_backbone=True, num_train_layers=num_layers)
+    model = ResNet50(
+        binary_classification=True, freeze_backbone=True, num_train_layers=num_layers
+    )
     device = get_device()
 
     # Ask for gradient monitoring
@@ -201,26 +214,42 @@ def run_experiment_1_semi_supervised():
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
     print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
-    
+
     with open("semi_supervised_results.csv", "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Label fraction", label_fraction, "Test Acc", test_acc, "Test Loss", test_loss])
+        writer.writerow(
+            [
+                "Label fraction",
+                label_fraction,
+                "Test Acc",
+                test_acc,
+                "Test Loss",
+                test_loss,
+            ]
+        )
+
 
 def run_experiment_2_semi_supervised():
     print("\nRunning semi-supervised experiment (multi-class classification)...")
 
     label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
-    num_layers = int(input("Insert the number of layers to train (last layer excluded): "))
-
-    # Load semi-supervised splits
-    labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
-        data_dir="../data/raw",
-        batch_size=32,
-        label_fraction=label_fraction,
-        binary_classification=False,
+    num_layers = int(
+        input("Insert the number of layers to train (last layer excluded): ")
     )
 
-    model = ResNet50(binary_classification=False, freeze_backbone=True, num_train_layers=num_layers)
+    # Load semi-supervised splits
+    labeled_loader, unlabeled_loader, val_loader, test_loader = (
+        OxfordPetDataset.get_semi_supervised_loaders(
+            data_dir="../data/raw",
+            batch_size=32,
+            label_fraction=label_fraction,
+            binary_classification=False,
+        )
+    )
+
+    model = ResNet50(
+        binary_classification=False, freeze_backbone=True, num_train_layers=num_layers
+    )
     device = get_device()
     trainer = ModelTrainer(model, device, binary_classification=False)
 
@@ -240,10 +269,21 @@ def run_experiment_2_semi_supervised():
 
     # Optional: Save results
     import csv
+
     with open("semi_supervised_results_multiclass.csv", "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Label fraction", label_fraction, "Test Acc", test_acc, "Test Loss", test_loss])
-        
+        writer.writerow(
+            [
+                "Label fraction",
+                label_fraction,
+                "Test Acc",
+                test_acc,
+                "Test Loss",
+                test_loss,
+            ]
+        )
+
+
 def run_experiment_2():
     """Run multi-class classification experiment"""
     print("\n" + "=" * 70)
@@ -286,7 +326,6 @@ def run_experiment_2():
                 num_train_layers=0,  # Initially, only classifier is unfrozen by ResNet50 class
             )
         else:
-
             model = ResNet50(
                 binary_classification=False,
                 freeze_backbone=True,  # ResNet50 handles unfreezing based on num_train_layers
@@ -297,12 +336,16 @@ def run_experiment_2():
         device = get_device()
 
         # Ask for gradient monitoring
-        monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+        monitor_grads_choice = input(
+            "\nDo you want to monitor gradients? (y/n): "
+        ).lower()
         monitor_gradients = monitor_grads_choice == "y"
         gradient_monitor_interval = 100  # Default
         if monitor_gradients:
             try:
-                interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+                interval = int(
+                    input("Monitor gradients every N batches (e.g., 50, 100): ")
+                )
                 if interval > 0:
                     gradient_monitor_interval = interval
                 else:
@@ -311,8 +354,21 @@ def run_experiment_2():
                 print("Invalid input, using default interval 100.")
 
         # Create trainer
-        if user_input == -2 or user_input == -3:  # Different learning rates for each layer
-            learning_rates = [1e-3, 5e-4, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7, 5e-8]
+        if (
+            user_input == -2 or user_input == -3
+        ):  # Different learning rates for each layer
+            learning_rates = [
+                1e-3,
+                5e-4,
+                1e-4,
+                5e-5,
+                1e-5,
+                5e-6,
+                1e-6,
+                5e-7,
+                1e-7,
+                5e-8,
+            ]
         else:
             learning_rates = [0.001]
         trainer = ModelTrainer(
@@ -355,6 +411,7 @@ def run_experiment_2():
         run_experiment_2_semi_supervised()
     else:
         print("Invalid option.")
+
 
 def run_experiment_vit_binary():
     """Run ViT binary classification experiment"""
