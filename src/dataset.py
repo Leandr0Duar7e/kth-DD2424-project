@@ -5,6 +5,7 @@ import os
 from PIL import Image
 import pandas as pd
 import torch
+import random
 from transformers import AutoImageProcessor
 
 
@@ -54,6 +55,8 @@ class OxfordPetDataset(Dataset):
         try:
             image = Image.open(img_path).convert("RGB")
         except:
+            if not os.path.exists(img_path):
+                print(f"File not found: {img_path}")
             # If image is corrupted, return a black image
             print(f"Corrupted image: {img_path}")
             image = Image.new("RGB", (224, 224))
@@ -194,3 +197,41 @@ class OxfordPetDataset(Dataset):
 
         num_classes = 1 if binary_classification else 37
         return train_loader, val_loader, test_loader, num_classes
+
+    @classmethod
+    def get_semi_supervised_loaders(cls, data_dir, batch_size=32, label_fraction=0.1, binary_classification=True):
+        """
+        Return (labeled_loader, unlabeled_loader, val_loader, test_loader) for semi-supervised training
+        """
+        transform = cls._get_transforms()
+        full_dataset = cls(
+            root_dir=data_dir,
+            transform=transform,
+            binary_classification=binary_classification,
+        )
+
+        # Shuffle and split
+        total_size = len(full_dataset)
+        indices = list(range(total_size))
+        torch.manual_seed(42)
+        torch.random.manual_seed(42)
+        
+        random.shuffle(indices)  # Make split reproducible
+        labeled_size = int(label_fraction * total_size)
+
+        labeled_indices = indices[:labeled_size]
+        unlabeled_indices = indices[labeled_size:int(0.8 * total_size)]
+        val_indices = indices[int(0.8 * total_size):int(0.9 * total_size)]
+        test_indices = indices[int(0.9 * total_size):]
+
+        labeled_set = torch.utils.data.Subset(full_dataset, labeled_indices)
+        unlabeled_set = torch.utils.data.Subset(full_dataset, unlabeled_indices)
+        val_set = torch.utils.data.Subset(full_dataset, val_indices)
+        test_set = torch.utils.data.Subset(full_dataset, test_indices)
+
+        labeled_loader = DataLoader(labeled_set, batch_size=batch_size, shuffle=True)
+        unlabeled_loader = DataLoader(unlabeled_set, batch_size=batch_size, shuffle=False)
+        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
+
+        return labeled_loader, unlabeled_loader, val_loader, test_loader
