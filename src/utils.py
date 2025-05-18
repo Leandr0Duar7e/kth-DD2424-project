@@ -3,6 +3,9 @@ import torch
 import random
 from tqdm import tqdm
 import time
+from collections import Counter
+import torch
+from torch.utils.data import WeightedRandomSampler, DataLoader
 
 # Constants
 SWEDISH_MESSAGES = [
@@ -100,3 +103,29 @@ def display_progress_with_humor(iterable, desc="Processing", total=None):
             pbar.set_description(desc)  # Restore the original description
 
         yield item
+
+def compute_class_weights(dataset, num_classes):
+    """
+    Computes inverse-frequency class weights for use in CrossEntropyLoss.
+    """
+    label_counts = Counter()
+    for _, label in dataset:
+        label_counts[int(label)] += 1
+
+    total = sum(label_counts.values())
+    weights = [total / (num_classes * label_counts[i]) if i in label_counts else 0.0
+               for i in range(num_classes)]
+    return torch.tensor(weights, dtype=torch.float)
+
+def get_oversampled_loader(dataset, batch_size):
+    """
+    Returns a DataLoader using WeightedRandomSampler to balance class frequencies.
+    """
+    label_counts = Counter()
+    for _, label in dataset:
+        label_counts[int(label)] += 1
+
+    weights = [1.0 / label_counts[int(label)] for _, label in dataset]
+    sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+
+    return DataLoader(dataset, batch_size=batch_size, sampler=sampler)

@@ -24,6 +24,7 @@ class OxfordPetDataset(Dataset):
         self.transform = transform if transform else self._get_transforms()
         self.binary_classification = binary_classification
 
+
         # Load the annotations file
         annotations_file = os.path.join(root_dir, "annotations", "list.txt")
         self.data = []
@@ -101,7 +102,7 @@ class OxfordPetDataset(Dataset):
                         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                     ),  # ImageNet normalization
                 ]
-            )
+            ) 
 
     @classmethod
     def get_dataloaders(
@@ -113,6 +114,7 @@ class OxfordPetDataset(Dataset):
         model_type="resnet",
         vit_model_name="google/vit-base-patch16-224",
         random_seed=42,
+        apply_imbalance=False,
     ):
         """
         Get train, validation and test dataloaders for the Oxford Pet Dataset
@@ -176,8 +178,32 @@ class OxfordPetDataset(Dataset):
             generator=generator,
         )
 
-        # Prepare the final training dataset for the DataLoader
-        final_train_dataset = train_subset
+        # Only include 20% of images from each cat breed (classes 0–11) to simulate imbalance
+        if apply_imbalance and not binary_classification:
+            print("Applying class imbalance: keeping 20% of cat breed samples in training...")
+
+            def create_imbalanced_subset(train_subset, full_dataset, keep_fraction=0.2):
+                from collections import defaultdict
+                import random
+
+                class_to_indices = defaultdict(list)
+                for idx in train_subset.indices:
+                    _, label = full_dataset[idx]
+                    class_to_indices[int(label)].append(idx)
+
+                imbalanced_indices = []
+                for class_id, indices in class_to_indices.items():
+                    if class_id < 12:  # Classes 0–11 are cat breeds
+                        n_keep = max(1, int(len(indices) * keep_fraction))
+                        imbalanced_indices.extend(random.sample(indices, n_keep))
+                    else:
+                        imbalanced_indices.extend(indices)
+
+                return torch.utils.data.Subset(full_dataset, imbalanced_indices)
+
+            final_train_dataset = create_imbalanced_subset(train_subset, dataset_for_splitting)
+        else:
+            final_train_dataset = train_subset
 
         if data_augmentation and model_type == "resnet":
             print("\nApplying data augmentation to the ResNet training set...")
