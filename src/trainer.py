@@ -16,6 +16,7 @@ class ModelTrainer:
         learning_rate: Learning rate for the optimizer
         monitor_gradients (bool): If True, logs gradient norms during training.
         gradient_monitor_interval (int): Interval (in batches) for logging gradient norms.
+        finetune_bn (bool): If True, batch normalization parameters will be fine-tuned during training.
     """
 
     def __init__(
@@ -23,36 +24,63 @@ class ModelTrainer:
         model,
         device,
         binary_classification=True,
-        learning_rate=[0.001],
+        learning_rate=[5e-5],
         lam=0.0,
         monitor_gradients=False,
         gradient_monitor_interval=100,
+        finetune_bn=True,
     ):
         self.model = model.to(device)
         self.device = device
         self.binary_classification = binary_classification
+        self.finetune_bn = finetune_bn
+        self.learning_rates = learning_rate  
+        self.weight_decay = lam  
 
-        param_groups = []
+        # Apply batch normalization freezing if specified
+        if not self.finetune_bn:
+            self._freeze_bn_params()
+            
 
         if len(learning_rate) == 1:
             learning_rate = learning_rate[0]
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=lam)
+            
         else:
-            weighted_layers = self.model.get_index_weighted_layers()
+            weighted_layers = self.model.get_index_weighted_layers(finetune_bn=finetune_bn)
             weighted_layers.reverse()
+            
+            print(f"Weighted layers: {weighted_layers}")
 
             backbone_layers = list(self.model.backbone.children())
-
-            for i in range(len(weighted_layers)):
-                param_groups.append(
-                    {
-                        "params": backbone_layers[weighted_layers[i]].parameters(),
-                        "lr": learning_rate[i],
+            
+            # non_weighted_layers = [i for i in range(len(backbone_layers)) if i not in weighted_layers]
+            # print(f"Non-weighted layers: {non_weighted_layers}")
+            
+            #self.layer_learning_rates = {}
+            param_groups = []
+            
+            for i in range(len(backbone_layers)):
+                layer_params = list(backbone_layers[i].parameters())
+                
+                if i in weighted_layers:             
+                
+                    param_groups.append({
+                        "params": layer_params,
+                        "lr": learning_rate[weighted_layers.index(i)],
                         "weight_decay": lam,
-                    }
-                )
-
+                    })
+                
+                else:
+                    param_groups.append({
+                        "params": layer_params,
+                        "lr": 1e-5,
+                        "weight_decay": lam,
+                    })
+            
+            
             self.optimizer = torch.optim.Adam(param_groups)
+            
 
         self.criterion = (
             nn.BCEWithLogitsLoss() if binary_classification else nn.CrossEntropyLoss()
@@ -66,6 +94,17 @@ class ModelTrainer:
         self.monitor_gradients = monitor_gradients
         self.gradient_monitor_interval = gradient_monitor_interval
 
+    def _freeze_bn_params(self):
+        """Freeze batch normalization parameters in the model."""
+        print("Freezing batch normalization parameters")
+        for module in self.model.modules():
+            if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
+                module.eval()  # Set BN layers to evaluation mode
+                
+                for param in module.parameters():
+                     param.requires_grad = False                                
+                
+                    
     def _log_gradient_norms(self, epoch, batch_idx):
         """Logs the L2 norm of gradients for each parameter and the total norm."""
         print(f"--- Gradient Norms at Epoch {epoch+1}, Batch {batch_idx+1} ---")
@@ -145,6 +184,9 @@ class ModelTrainer:
         print(
             f" Start Training {self.model.__class__.__name__} for {num_epochs} epochs"
         )
+        
+        if not self.finetune_bn:
+            print("Batch normalization parameters are frozen (not being fine-tuned)")
 
         # Reset history for a new training session
         self.history = {
@@ -156,7 +198,16 @@ class ModelTrainer:
 
         for epoch in range(num_epochs):
             # Training
-            self.model.train()
+            if self.finetune_bn:
+                self.model.train()  # Set model to training mode (including BN layers)
+            else:
+                # If not fine-tuning BN, we need to set the model to train mode but keep BN in eval mode
+                self.model.train()
+                # Re-freeze BN layers as model.train() would have set them to train mode
+                for module in self.model.modules():
+                    if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
+                        module.eval()
+                        
             train_loss = 0.0
             train_correct = 0
             train_total = 0
@@ -199,15 +250,18 @@ class ModelTrainer:
                 current_loss = train_loss / (progress_bar.n + 1)
                 current_acc = 100 * train_correct / train_total
                 progress_bar.set_postfix(
-                    {"loss": f"{current_loss:.4f}", "acc": f"{current_acc:.2f}%"}
+                    {"current_loss": f"{current_loss:.4f}", "current_acc": f"{current_acc:.2f}%"}
                 )
 
+            # Evaluate on train set
+            train_loss, train_acc = self.evaluate(train_loader)
+            
             # Validation
             val_loss, val_acc = self.evaluate(val_loader)
 
             # Record metrics
-            self.history["train_loss"].append(train_loss / len(train_loader))
-            self.history["train_acc"].append(100 * train_correct / train_total)
+            self.history["train_loss"].append(train_loss)
+            self.history["train_acc"].append(train_acc)
             self.history["val_loss"].append(val_loss)
             self.history["val_acc"].append(val_acc)
 
@@ -246,6 +300,9 @@ class ModelTrainer:
         print(
             f" Start Training {self.model.__class__.__name__} with Gradual Unfreezing for {num_epochs} epochs"
         )
+        
+        if not self.finetune_bn:
+            print("Batch normalization parameters are frozen (not being fine-tuned)")
 
         # Reset history for a new training session
         self.history = {
@@ -321,7 +378,16 @@ class ModelTrainer:
 
         step_counter = 0
         for epoch in range(num_epochs):
-            self.model.train()
+            if self.finetune_bn:
+                self.model.train()  # Set model to training mode (including BN layers)
+            else:
+                # If not fine-tuning BN, we need to set the model to train mode but keep BN in eval mode
+                self.model.train()
+                # Re-freeze BN layers as model.train() would have set them to train mode
+                for module in self.model.modules():
+                    if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
+                        module.eval()
+                        
             train_loss = 0.0
             train_correct = 0
             train_total = 0
@@ -362,7 +428,7 @@ class ModelTrainer:
                 current_loss = train_loss / (progress_bar.n + 1)
                 current_acc = 100 * train_correct / train_total
                 progress_bar.set_postfix(
-                    {"loss": f"{current_loss:.4f}", "acc": f"{current_acc:.2f}%"}
+                    {"curr_loss": f"{current_loss:.4f}", "curr_acc": f"{current_acc:.2f}%"}
                 )
 
                 step_counter += 1
@@ -376,21 +442,31 @@ class ModelTrainer:
                         unfreeze_layer_group_idx_to_unfreeze
                     ]
                     print(
-                        f"\nUnfreezing layer group {unfreeze_layer_group_idx_to_unfreeze+1}/{len(actual_param_layers)} (step {step_counter}) name: {layer_to_unfreeze.__class__.__name__}"
+                        f"\nUnfreezing layer group {unfreeze_layer_group_idx_to_unfreeze+1} (step {step_counter}) name: {layer_to_unfreeze.__class__.__name__}"
                     )
-                    for param in layer_to_unfreeze.parameters():
-                        param.requires_grad = True
-                    # Re-create optimizer to include newly unfrozen parameters if its Adam, Adagrad etc.
-                    # For SGD it might not be strictly necessary but good practice.
-                    self.optimizer = torch.optim.Adam(
-                        filter(lambda p: p.requires_grad, self.model.parameters()),
-                        lr=self.optimizer.param_groups[0]["lr"],
-                    )
+                    
+                    for name, param in layer_to_unfreeze.named_parameters():
+                        if not param.requires_grad:  
+                            if not self.finetune_bn:
+                                # BatchNorm parameter names in PyTorch always include "bn" by convention
+                                if "bn" not in name:
+                                    print(f"unfreezing {name},  {param.requires_grad}")
+                                    param.requires_grad = True
+                            else:
+                                print(f"unfreezing {name},  {param.requires_grad}")
+                                param.requires_grad = True
+                    
+                    
                     unfreeze_layer_group_idx_to_unfreeze -= 1
 
+
+            # Evaluate on train set
+            train_loss, train_acc = self.evaluate(train_loader)
+            # Evaluate on val set
             val_loss, val_acc = self.evaluate(val_loader)
-            self.history["train_loss"].append(train_loss / len(train_loader))
-            self.history["train_acc"].append(100 * train_correct / train_total)
+            
+            self.history["train_loss"].append(train_loss)
+            self.history["train_acc"].append(train_acc)
             self.history["val_loss"].append(val_loss)
             self.history["val_acc"].append(val_acc)
 
@@ -492,6 +568,7 @@ class ModelTrainer:
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "history": self.history,
                 "binary_classification": self.binary_classification,
+                "finetune_bn": self.finetune_bn,  # Save BN fine-tuning setting
                 # Optionally save model_architecture and model_type if needed for loading
                 "model_architecture": model_architecture,
                 "model_name_or_path": getattr(
