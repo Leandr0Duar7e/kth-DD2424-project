@@ -204,39 +204,70 @@ class OxfordPetDataset(Dataset):
         return train_loader, val_loader, test_loader, num_classes
 
     @classmethod
-    def get_semi_supervised_loaders(cls, data_dir, batch_size=32, label_fraction=0.1, binary_classification=True):
+    def get_semi_supervised_loaders(
+        cls,
+        data_dir,
+        batch_size=32,
+        label_fraction=0.1,
+        binary_classification=True,
+        data_augmentation=False,
+        model_type="resnet",
+        vit_model_name="google/vit-base-patch16-224",
+    ):
         """
         Return (labeled_loader, unlabeled_loader, val_loader, test_loader) for semi-supervised training
         """
-        transform = cls._get_transforms()
+
+        # --- 1. Choose the base transform ---
+        if model_type == "vit":
+            print(f"\nUsing ViT image processor for {vit_model_name}...")
+            image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
+            base_transform = lambda pil_img: image_processor(images=pil_img, return_tensors="pt")["pixel_values"].squeeze(0)
+        else:
+            print("\nUsing ResNet image transforms...")
+            base_transform = cls._get_transforms(data_augmentation=False)
+
+        # --- 2. Create a single dataset for splitting ---
         full_dataset = cls(
             root_dir=data_dir,
-            transform=transform,
+            transform=base_transform,
             binary_classification=binary_classification,
         )
 
-        # Shuffle and split
+        # --- 3. Shuffle and split indices ---
         total_size = len(full_dataset)
         indices = list(range(total_size))
         torch.manual_seed(42)
         torch.random.manual_seed(42)
-        
-        random.shuffle(indices)  # Make split reproducible
-        labeled_size = int(label_fraction * total_size)
+        random.shuffle(indices)
 
+        labeled_size = int(label_fraction * total_size)
         labeled_indices = indices[:labeled_size]
         unlabeled_indices = indices[labeled_size:int(0.8 * total_size)]
         val_indices = indices[int(0.8 * total_size):int(0.9 * total_size)]
         test_indices = indices[int(0.9 * total_size):]
 
-        labeled_set = torch.utils.data.Subset(full_dataset, labeled_indices)
-        unlabeled_set = torch.utils.data.Subset(full_dataset, unlabeled_indices)
-        val_set = torch.utils.data.Subset(full_dataset, val_indices)
-        test_set = torch.utils.data.Subset(full_dataset, test_indices)
+        # --- 4. Apply optional augmentation to labeled set only (for ResNet only) ---
+        if model_type == "resnet" and data_augmentation:
+            print("\nApplying data augmentation to labeled ResNet training set...")
+            augment_transform = cls._get_transforms(data_augmentation=True)
+            augmented_dataset = cls(
+                root_dir=data_dir,
+                transform=augment_transform,
+                binary_classification=binary_classification,
+            )
+            labeled_dataset = torch.utils.data.Subset(augmented_dataset, labeled_indices)
+        else:
+            labeled_dataset = torch.utils.data.Subset(full_dataset, labeled_indices)
 
-        labeled_loader = DataLoader(labeled_set, batch_size=batch_size, shuffle=True)
-        unlabeled_loader = DataLoader(unlabeled_set, batch_size=batch_size, shuffle=False)
-        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
-        test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
+        unlabeled_dataset = torch.utils.data.Subset(full_dataset, unlabeled_indices)
+        val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
+        test_dataset = torch.utils.data.Subset(full_dataset, test_indices)
+
+        # --- 5. Create loaders ---
+        labeled_loader = DataLoader(labeled_dataset, batch_size=batch_size, shuffle=True)
+        unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=batch_size, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
         return labeled_loader, unlabeled_loader, val_loader, test_loader
