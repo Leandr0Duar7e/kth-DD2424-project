@@ -18,7 +18,7 @@ import numpy as np
 # If src is in PYTHONPATH or running from src/, these should work.
 from dataset import OxfordPetDataset
 from models.resnet import ResNet50
-from models.vit import VisionTransformerModel
+from models.vit import ViT
 
 
 class ModelEvaluator:
@@ -29,132 +29,343 @@ class ModelEvaluator:
         self.device = device
         self.data_dir = data_dir
         self.batch_size = batch_size
-        self.results_dir = (
-            results_dir  # This is EVALUATION_ROOT_DIR, e.g., ../evaluation
-        )
-        os.makedirs(self.results_dir, exist_ok=True)
+        self.results_dir = results_dir
 
-        self.checkpoint = torch.load(model_path, map_location=device)
+        print(f"DEBUG: Initializing ModelEvaluator for {self.model_path}")
+
+        try:
+            self.checkpoint = torch.load(self.model_path, map_location=self.device)
+            print(f"DEBUG: Checkpoint loaded successfully for {self.model_path}.")
+            print(f"DEBUG: self.checkpoint type: {type(self.checkpoint)}")
+            if self.checkpoint is None:
+                raise FileNotFoundError(
+                    f"Checkpoint data is None after loading {self.model_path}"
+                )
+            print(
+                f"DEBUG: self.checkpoint keys (first level): {list(self.checkpoint.keys()) if isinstance(self.checkpoint, dict) else 'Not a dict'}"
+            )
+        except FileNotFoundError as e:
+            print(
+                f"ERROR_DEBUG: Could not load checkpoint: {self.model_path}. Error: {e}"
+            )
+            raise  # Re-raise the exception to stop further execution
+        except Exception as e:
+            print(
+                f"ERROR_DEBUG: An unexpected error occurred while loading checkpoint {self.model_path}. Error: {e}"
+            )
+            raise  # Re-raise for critical failure
+
         self.model_architecture = self.checkpoint.get("model_architecture", "unknown")
-        # self.model_type derived from binary_classification flag later
         self.is_binary_classification = self.checkpoint.get(
             "binary_classification", True
-        )
+        )  # Default based on original project
         self.model_name_or_path = self.checkpoint.get("model_name_or_path")  # For ViT
 
-        self.model_filename = os.path.basename(model_path)
-        # Subdirectory for this specific model's evaluation files
+        print(f"DEBUG: Model architecture from checkpoint: {self.model_architecture}")
+        print(
+            f"DEBUG: Is binary classification from checkpoint: {self.is_binary_classification}"
+        )
+        print(
+            f"DEBUG: ViT model_name_or_path from checkpoint: {self.model_name_or_path}"
+        )
+
+        self.model_filename = os.path.basename(self.model_path)
         self.evaluation_subdir = os.path.join(
             self.results_dir, os.path.splitext(self.model_filename)[0]
         )
         os.makedirs(self.evaluation_subdir, exist_ok=True)
+        print(f"DEBUG: Evaluation subdirectory: {self.evaluation_subdir}")
 
-        self.num_classes = 0  # Will be set in _load_model
-        self.class_names = []  # Will be set in _get_test_dataloader
+        # self.num_classes will be set by _load_model_and_set_classes
+        # self.class_names will be set by _get_test_dataloader
+        self.model, self.num_classes = self._load_model_and_set_classes()
 
-        self.model = self._load_model()  # Sets self.num_classes
-        self.test_loader = (
-            self._get_test_dataloader()
-        )  # Sets self.class_names based on num_classes and dataset
+        if self.model:
+            print(f"DEBUG: Model loaded and num_classes set to: {self.num_classes}")
+            self.test_loader, self.class_names = self._get_test_dataloader()
+            print(
+                f"DEBUG: Test dataloader and class_names ({self.class_names}) obtained."
+            )
+        else:
+            print(
+                f"ERROR_DEBUG: Model could not be loaded in __init__. Aborting further setup for {self.model_path}."
+            )
+            # Handle cases where model loading might fail gracefully if needed, or ensure _load_model_and_set_classes raises
+            self.test_loader = None
+            self.class_names = []
 
-    def _load_model(self):
-        # Infer num_classes from the model's state_dict's final layer
-        last_layer_weights = None
+    def _load_model_and_set_classes(self):
+        print(f"DEBUG: Entering _load_model_and_set_classes for {self.model_path}")
+        if not self.checkpoint or not isinstance(self.checkpoint, dict):
+            print(
+                f"ERROR_DEBUG: Checkpoint not loaded or not a dict in _load_model_and_set_classes for {self.model_path}."
+            )
+            raise ValueError(
+                "Checkpoint not loaded correctly before calling _load_model_and_set_classes."
+            )
+
         state_dict = self.checkpoint.get("model_state_dict")
         if not state_dict:
+            print(
+                f"ERROR_DEBUG: model_state_dict not found in checkpoint for {self.model_path}"
+            )
             raise ValueError(
                 f"model_state_dict not found in checkpoint: {self.model_path}"
             )
+        print(f"DEBUG: model_state_dict obtained. Keys count: {len(state_dict.keys())}")
+
+        num_classes = 0
+        loaded_model = None
 
         if self.model_architecture == "resnet":
+            print(f"DEBUG: Loading ResNet model from checkpoint.")
+            determined_key_name = None
+            last_layer_weights = None
+
             if "fc.weight" in state_dict:
-                last_layer_weights = state_dict["fc.weight"]
+                determined_key_name = "fc.weight"
+            elif (
+                "backbone.fc.weight" in state_dict
+            ):  # Should not happen with current saving
+                determined_key_name = "backbone.fc.weight"
+            else:  # Fallback
+                for key_in_dict in state_dict.keys():
+                    if key_in_dict.endswith("fc.weight") or key_in_dict.endswith(
+                        "classifier.weight"
+                    ):
+                        determined_key_name = key_in_dict
+                        break
+
+            if determined_key_name:
+                print(f"DEBUG: ResNet classifier key: '{determined_key_name}'")
+                last_layer_weights = state_dict[determined_key_name]
+                num_classes = last_layer_weights.shape[0]
+                # Use self.is_binary_classification which is read from the checkpoint
+                # freeze_backbone=False as we are loading a saved model for evaluation, not training setup
+                print(
+                    f"DEBUG: Initializing ResNet50 with binary_classification={self.is_binary_classification} (derived from checkpoint)"
+                )
+                loaded_model = ResNet50(
+                    binary_classification=self.is_binary_classification,
+                    freeze_backbone=False,
+                )
+                print(
+                    f"DEBUG: ResNet initialized. Expected num classes by model init: {'1 (binary)' if self.is_binary_classification else '37 (multiclass)'}. Actual from checkpoint: {num_classes}"
+                )
+
+                # Sanity check if the model's internal num_classes matches what we found
+                # The ResNet50 class sets its fc layer based on binary_classification flag.
+                # If binary_classification is True, fc_output_features is 1.
+                # If binary_classification is False, fc_output_features is 37.
+                expected_fc_output_features = 1 if self.is_binary_classification else 37
+                if num_classes != expected_fc_output_features:
+                    # This can happen if a binary model was saved with 2 output neurons (e.g. for CrossEntropyLoss with 2 classes)
+                    # but our ResNet50 class definition for binary uses 1 output neuron (for BCEWithLogitsLoss)
+                    # Or if a multiclass model was saved with a different number of classes than 37.
+                    print(
+                        f"WARNING_DEBUG: Mismatch between num_classes from checkpoint's fc layer ({num_classes}) "
+                        f"and expected fc output features from ResNet50 class with binary_classification={self.is_binary_classification} ({expected_fc_output_features})."
+                    )
+                    print(
+                        f"Proceeding with num_classes={num_classes} from checkpoint for state_dict loading."
+                    )
+                    # The loaded_model was already initialized based on self.is_binary_classification.
+                    # The load_state_dict call later should handle the actual layer sizes from the checkpoint.
+
+            else:
+                print(
+                    f"ERROR_DEBUG: Could not determine ResNet classifier layer key for {self.model_path}."
+                )
+                raise KeyError(
+                    f"Could not determine ResNet classifier layer key. Keys: {list(state_dict.keys())}"
+                )
+
         elif self.model_architecture == "vit":
+            print(f"DEBUG: Loading ViT model from checkpoint.")
             possible_keys = [
                 "classifier.weight",
                 "vit.classifier.weight",
                 "head.weight",
-            ]  # Common ViT classifier layer names
+            ]
+            last_layer_weights = None
             for key in possible_keys:
                 if key in state_dict:
                     last_layer_weights = state_dict[key]
+                    print(f"DEBUG: ViT classifier key: '{key}'")
                     break
 
-        if last_layer_weights is None:
-            raise ValueError(
-                f"Could not determine the number of classes from the model checkpoint's final layer: {self.model_path}"
-            )
-
-        self.num_classes = last_layer_weights.size(0)
-
-        if self.model_architecture == "resnet":
-            model = ResNet50(num_classes=self.num_classes, pretrained=False)
-        elif self.model_architecture == "vit":
-            if not self.model_name_or_path:
-                # Fallback for older models that might not have saved model_name_or_path
-                # Defaulting based on common ViT if binary/multiclass output matches. This is a guess.
-                print(
-                    f"Warning: ViT model_name_or_path not found in checkpoint {self.model_path}. Using default 'google/vit-base-patch16-224'."
+            if last_layer_weights is not None:
+                num_classes = last_layer_weights.size(0)
+                # Ensure model_name_or_path is available, fallback if necessary
+                vit_model_identifier = self.model_name_or_path
+                if not vit_model_identifier:
+                    vit_model_identifier = "google/vit-base-patch16-224"  # Default
+                    print(
+                        f"Warning: ViT model_name_or_path not in checkpoint. Using default: {vit_model_identifier}"
+                    )
+                loaded_model = ViT(
+                    model_name_or_path=vit_model_identifier,
+                    num_classes=num_classes,
+                    pretrained_weights=False,
                 )
-                self.model_name_or_path = "google/vit-base-patch16-224"
-            model = VisionTransformerModel(
-                model_name_or_path=self.model_name_or_path,
-                num_classes=self.num_classes,
-                pretrained_weights=False,  # We load from checkpoint
-            )
+                print(f"DEBUG: ViT initialized. Num classes: {num_classes}")
+            else:
+                print(
+                    f"ERROR_DEBUG: Could not determine ViT classifier layer key for {self.model_path}."
+                )
+                raise KeyError(
+                    f"Could not determine ViT classifier layer key. Keys: {list(state_dict.keys())}"
+                )
         else:
+            print(
+                f"ERROR_DEBUG: Unknown model architecture: {self.model_architecture} for {self.model_path}"
+            )
             raise ValueError(f"Unknown model architecture: {self.model_architecture}")
 
-        model.load_state_dict(state_dict)
-        model.to(self.device)
-        model.eval()
-        return model
+        if loaded_model and num_classes > 0:
+            loaded_model.load_state_dict(state_dict)
+            loaded_model.to(self.device)
+            loaded_model.eval()
+            print(
+                f"DEBUG: Model '{self.model_architecture}' loaded, weights set, and in eval mode."
+            )
+            return loaded_model, num_classes
+        else:
+            print(
+                f"ERROR_DEBUG: Failed to load model or determine num_classes for {self.model_path}"
+            )
+            # This should ideally be caught by earlier raises if keys aren't found
+            raise SystemError(
+                f"Failed to correctly load model or determine num_classes for {self.model_path}"
+            )
 
     def _get_test_dataloader(self):
-        # Ensure data_augmentation is False for testing.
-        # Use a consistent random_seed for the test split.
-        _, _, test_loader = OxfordPetDataset.get_dataloaders(
+        print(
+            f"DEBUG: Getting test dataloader. Num classes for dataset: {self.num_classes}, Binary classification: {self.is_binary_classification}"
+        )
+        # Determine actual binary_classification flag for dataset loading
+        # If num_classes is 2, it's likely binary, but self.is_binary_classification from checkpoint is more reliable
+        dataset_binary_flag = self.is_binary_classification
+
+        # OxfordPetDataset's get_dataloaders expects binary_classification to guide label processing.
+        # If num_classes is > 2, it MUST be multiclass for the dataset.
+        if self.num_classes > 2 and dataset_binary_flag:
+            print(
+                f"Warning: num_classes is {self.num_classes} but checkpoint says binary. Forcing dataset to multiclass for dataloader."
+            )
+            dataset_binary_flag = False
+        elif self.num_classes == 2 and not dataset_binary_flag:
+            print(
+                f"Warning: num_classes is 2 but checkpoint says multiclass. Forcing dataset to binary for dataloader."
+            )
+            dataset_binary_flag = True
+
+        # Get dataloaders - the fourth item is num_classes_from_dataset (an int)
+        _, _, test_loader, num_classes_from_dataset = OxfordPetDataset.get_dataloaders(
             data_dir=self.data_dir,
             batch_size=self.batch_size,
-            binary_classification=self.is_binary_classification,
-            data_augmentation=False,
-            model_type=self.model_architecture,
+            binary_classification=dataset_binary_flag,  # Use the determined flag
+            data_augmentation=False,  # No augmentation for testing
+            model_type=self.model_architecture,  # Pass architecture for potential ViT specific transforms
             vit_model_name=(
                 self.model_name_or_path
                 if self.model_architecture == "vit"
                 else "google/vit-base-patch16-224"
-            ),  # Default for non-ViT call
-            random_seed=42,  # Crucial for consistent test set
+            ),
+            random_seed=42,  # Consistent seed for test split
+        )
+        print(
+            f"DEBUG: Dataloader obtained. Num classes from dataset method: {num_classes_from_dataset}"
         )
 
-        # Determine class names
-        # test_loader.dataset is a Subset, test_loader.dataset.dataset is the OxfordPetDataset instance
-        full_dataset = test_loader.dataset.dataset
+        # Validate num_classes from model with num_classes_from_dataset
+        # Both self.num_classes (from model checkpoint) and num_classes_from_dataset (from dataset loader config) should align.
+        if self.num_classes != num_classes_from_dataset:
+            print(
+                f"ERROR_DEBUG: Mismatch! Num_classes from model checkpoint ({self.num_classes}) vs num_classes from dataset configuration ({num_classes_from_dataset})"
+            )
+            # This is a significant mismatch and likely indicates a problem in how the model was saved or how the dataset is being loaded for its type.
+            # For ResNet binary, model checkpoint num_classes might be 1 (logit) or 2 (softmaxed classes). Dataset should return 1 if binary_classification=True.
+            # For ResNet multiclass, model checkpoint num_classes should be 37. Dataset should return 37 if binary_classification=False.
+            if (
+                self.model_architecture == "resnet"
+                and self.is_binary_classification
+                and self.num_classes == 1
+                and num_classes_from_dataset == 1
+            ):
+                print(
+                    "INFO_DEBUG: ResNet binary (1 output neuron from model, 1 class type from dataset). This is consistent."
+                )
+            elif (
+                self.model_architecture == "resnet"
+                and not self.is_binary_classification
+                and self.num_classes == 37
+                and num_classes_from_dataset == 37
+            ):
+                print(
+                    "INFO_DEBUG: ResNet multiclass (37 output neurons from model, 37 class type from dataset). This is consistent."
+                )
+            elif (
+                self.model_architecture == "vit"
+                and self.is_binary_classification
+                and self.num_classes == 2
+                and num_classes_from_dataset == 1
+            ):  # ViT usually outputs 2 for binary_cross_entropy
+                print(
+                    "INFO_DEBUG: ViT binary (2 output neurons from model, 1 class type from dataset config). This implies dataset is binary."
+                )
+                # This can be acceptable if the ViT model uses 2 outputs for binary and dataset is configured as binary (num_classes_from_dataset=1)
+            elif (
+                self.model_architecture == "vit"
+                and not self.is_binary_classification
+                and self.num_classes == 37
+                and num_classes_from_dataset == 37
+            ):
+                print(
+                    "INFO_DEBUG: ViT multiclass (37 output neurons from model, 37 class type from dataset). This is consistent."
+                )
+            else:
+                raise ValueError(
+                    f"Critical mismatch between model's num_classes ({self.num_classes}) and dataset's configured num_classes ({num_classes_from_dataset})."
+                )
+
+        # Generate class names for reporting based on self.is_binary_classification (from checkpoint)
+        # and num_classes_from_dataset (which should align with self.num_classes after the check above)
+        class_names_for_report = []
         if self.is_binary_classification:
-            self.class_names = ["Cat", "Dog"]  # Explicit for binary task
-            if self.num_classes != 2:  # Sanity check
-                print(
-                    f"Warning: Binary classification flag is True, but model output units are {self.num_classes}. Adjusting class names based on model output."
-                )
-                self.class_names = [f"Class {i}" for i in range(self.num_classes)]
+            # If model is binary (e.g. ResNet outputs 1 logit, or ViT outputs 2 logits for binary CE)
+            # And dataset was loaded as binary (num_classes_from_dataset should be 1)
+            print(
+                "INFO_DEBUG: Binary classification. Generating class names ['Cat', 'Dog'] for reporting."
+            )
+            class_names_for_report = ["Cat", "Dog"]
+        else:  # Multiclass
+            # num_classes_from_dataset should be 37 for multiclass
+            print(
+                f"INFO_DEBUG: Multiclass classification ({num_classes_from_dataset} classes). Generating generic breed names for reporting."
+            )
+            class_names_for_report = [
+                f"Breed_{i}" for i in range(num_classes_from_dataset)
+            ]
 
-        elif hasattr(full_dataset, "classes") and full_dataset.classes:
-            self.class_names = full_dataset.classes
-            if len(self.class_names) != self.num_classes:  # Sanity check
-                print(
-                    f"Warning: Mismatch between dataset classes ({len(self.class_names)}) and model output units ({self.num_classes}). Using model's num_classes."
-                )
-                self.class_names = [
-                    f"Class {i}" for i in range(self.num_classes)
-                ]  # Fallback
-        else:
-            self.class_names = [
-                f"Class {i}" for i in range(self.num_classes)
-            ]  # Generic fallback
-
-        return test_loader
+        return test_loader, class_names_for_report
 
     def evaluate(self):
+        print(f"DEBUG: Entering evaluate() for {self.model_path}")
+        print(
+            f"DEBUG: self.checkpoint type at start of evaluate: {type(self.checkpoint)}"
+        )
+        if self.checkpoint is None:
+            print(
+                f"ERROR_DEBUG: self.checkpoint is None at the start of evaluate() for {self.model_path}. This should have been caught in _load_model."
+            )
+            # This indicates a logic error if _load_model was supposed to guarantee self.checkpoint is not None
+            return  # Or raise an error
+        else:
+            print(
+                f"DEBUG: self.checkpoint keys at start of evaluate (first level): {list(self.checkpoint.keys()) if isinstance(self.checkpoint, dict) else 'Not a dict'}"
+            )
+
         metric_file_path = os.path.join(
             self.evaluation_subdir, "evaluation_metrics.json"
         )
@@ -196,19 +407,65 @@ class ModelEvaluator:
         all_labels = np.array(all_labels)
         all_probs = np.array(all_probs)
 
-        # Ensure class_names for classification_report matches num_classes
-        report_class_names = self.class_names
-        if len(self.class_names) != self.num_classes:
-            print(
-                f"Adjusting class names for report: using {self.num_classes} generic names as there's a mismatch."
-            )
-            report_class_names = [f"Class {i}" for i in range(self.num_classes)]
+        unique_true_and_pred_labels = sorted(
+            list(np.unique(np.concatenate((all_labels, all_preds))))
+        )
+        print(
+            f"DEBUG: Unique labels found in true and preds: {unique_true_and_pred_labels}"
+        )
 
-        accuracy = np.mean(all_preds == all_labels)
+        target_names_for_report = []
+        if self.is_binary_classification:
+            # For binary, self.class_names is already ['Cat', 'Dog']
+            # We need to select the correct names based on actual labels present
+            temp_binary_names = {}
+            if 0 in unique_true_and_pred_labels:  # Cat
+                temp_binary_names[0] = self.class_names[0]  # Should be 'Cat'
+            if 1 in unique_true_and_pred_labels:  # Dog
+                temp_binary_names[1] = self.class_names[1]  # Should be 'Dog'
+            target_names_for_report = [
+                temp_binary_names[label]
+                for label in unique_true_and_pred_labels
+                if label in temp_binary_names
+            ]
+            if not target_names_for_report and unique_true_and_pred_labels:
+                # Fallback if only one class predicted and it wasn't 0 or 1, or self.class_names was wrong
+                print(
+                    f"WARNING: Binary classification with unusual labels {unique_true_and_pred_labels}. Using generic target names."
+                )
+                target_names_for_report = [
+                    f"ActualClass_{i}" for i in unique_true_and_pred_labels
+                ]
+        else:  # Multiclass
+            # self.class_names should be ['Breed_0', ..., 'Breed_36']
+            # We only want names for labels that are actually present.
+            target_names_for_report = []
+            for label_val in unique_true_and_pred_labels:
+                if 0 <= label_val < len(self.class_names):
+                    target_names_for_report.append(self.class_names[label_val])
+                else:
+                    target_names_for_report.append(
+                        f"ActualClass_{label_val}"
+                    )  # Fallback for unexpected label values
+
+        # Ensure target_names_for_report has same length as unique_true_and_pred_labels
+        if len(target_names_for_report) != len(unique_true_and_pred_labels):
+            print(
+                f"CRITICAL_DEBUG: Length mismatch after generating target_names_for_report. unique_labels: {unique_true_and_pred_labels}, generated_names: {target_names_for_report}"
+            )
+            # Fallback to generic names based on unique_true_and_pred_labels to prevent crash
+            target_names_for_report = [
+                f"FallbackClass_{i}" for i in unique_true_and_pred_labels
+            ]
+
+        print(
+            f"Debug: Classification report will use target_names: {target_names_for_report} and labels: {unique_true_and_pred_labels}"
+        )
         report_dict = classification_report(
             all_labels,
             all_preds,
-            target_names=report_class_names,
+            target_names=target_names_for_report,  # Must match the order and number of unique_true_and_pred_labels
+            labels=unique_true_and_pred_labels,  # Explicitly pass the labels that are present and to be reported
             output_dict=True,
             zero_division=0,
         )
@@ -220,7 +477,7 @@ class ModelEvaluator:
                 "binary" if self.is_binary_classification else "multiclass"
             ),
             "num_classes_model": self.num_classes,
-            "accuracy": accuracy,
+            "accuracy": np.mean(all_preds == all_labels),
             "classification_report": report_dict,
             "roc_auc": None,
             "pr_auc": None,
@@ -259,7 +516,7 @@ class ModelEvaluator:
             )  # Use NpEncoder for numpy types
 
         self.plot_confusion_matrix(
-            all_labels, all_preds, report_class_names, "confusion_matrix.png"
+            all_labels, all_preds, target_names_for_report, "confusion_matrix.png"
         )
 
         if "history" in self.checkpoint:

@@ -200,7 +200,9 @@ class OxfordPetDataset(Dataset):
         val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
         test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
+        # Determine num_classes to return
         num_classes = 1 if binary_classification else 37
+
         return train_loader, val_loader, test_loader, num_classes
 
     @classmethod
