@@ -14,13 +14,46 @@ class ModelTrainer:
         device: The device to use for training (cuda or cpu)
         binary_classification: Whether the model is for binary classification
         learning_rate: Learning rate for the optimizer
+        monitor_gradients (bool): If True, logs gradient norms during training.
+        gradient_monitor_interval (int): Interval (in batches) for logging gradient norms.
     """
 
-    def __init__(self, model, device, binary_classification=True, learning_rate=0.001):
+    def __init__(
+        self,
+        model,
+        device,
+        binary_classification=True,
+        learning_rate=[0.001],
+        lam=0.0,
+        monitor_gradients=False,
+        gradient_monitor_interval=100,
+    ):
         self.model = model.to(device)
         self.device = device
         self.binary_classification = binary_classification
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+
+        param_groups = []
+
+        if len(learning_rate) == 1:
+            learning_rate = learning_rate[0]
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        else:
+            weighted_layers = self.model.get_index_weighted_layers()
+            weighted_layers.reverse()
+
+            backbone_layers = list(self.model.backbone.children())
+
+            for i in range(len(weighted_layers)):
+                param_groups.append(
+                    {
+                        "params": backbone_layers[weighted_layers[i]].parameters(),
+                        "lr": learning_rate[i],
+                        "weight_decay": lam,
+                    }
+                )
+
+            self.optimizer = torch.optim.Adam(param_groups)
+
         self.criterion = (
             nn.BCEWithLogitsLoss() if binary_classification else nn.CrossEntropyLoss()
         )
@@ -30,6 +63,23 @@ class ModelTrainer:
             "val_loss": [],
             "val_acc": [],
         }
+        self.monitor_gradients = monitor_gradients
+        self.gradient_monitor_interval = gradient_monitor_interval
+
+    def _log_gradient_norms(self, epoch, batch_idx):
+        """Logs the L2 norm of gradients for each parameter and the total norm."""
+        print(f"--- Gradient Norms at Epoch {epoch+1}, Batch {batch_idx+1} ---")
+        total_norm = 0.0
+        for name, param in self.model.named_parameters():
+            if param.grad is not None and param.requires_grad:
+                param_norm = param.grad.norm(2).item()
+                total_norm += param_norm**2
+                print(f"  Param: {name:<50} | Grad Norm: {param_norm:.4e}")
+            elif param.requires_grad:
+                print(f"  Param: {name:<50} | Grad Norm: None (param.grad is None)")
+        total_norm = total_norm**0.5
+        print(f"  Total gradient norm for all trainable parameters: {total_norm:.4e}")
+        print(f"--- End of Gradient Norms ---")
 
     def combine_loaders(self, labeled_loader, pseudo_loader):
         """
@@ -114,7 +164,7 @@ class ModelTrainer:
             # Use tqdm for a progress bar
             progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}")
 
-            for inputs, labels in progress_bar:
+            for batch_idx, (inputs, labels) in enumerate(progress_bar):
                 inputs = inputs.to(self.device)
                 # Convert labels to appropriate type based on classification type
                 if self.binary_classification:
@@ -126,6 +176,14 @@ class ModelTrainer:
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs.squeeze(), labels)
                 loss.backward()
+
+                # Monitor gradient norms
+                if (
+                    self.monitor_gradients
+                    and (batch_idx + 1) % self.gradient_monitor_interval == 0
+                ):
+                    self._log_gradient_norms(epoch, batch_idx)
+
                 self.optimizer.step()
 
                 train_loss += loss.item()
@@ -271,7 +329,7 @@ class ModelTrainer:
                 train_loader, desc=f"Epoch {epoch+1}/{num_epochs} (Gradual Unfreeze)"
             )
 
-            for inputs, labels in progress_bar:
+            for batch_idx, (inputs, labels) in enumerate(progress_bar):
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 if self.binary_classification:
                     labels = labels.float()
@@ -282,6 +340,14 @@ class ModelTrainer:
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs.squeeze(), labels)
                 loss.backward()
+
+                # Monitor gradient norms
+                if (
+                    self.monitor_gradients
+                    and (batch_idx + 1) % self.gradient_monitor_interval == 0
+                ):
+                    self._log_gradient_norms(epoch, batch_idx)
+
                 self.optimizer.step()
 
                 train_loss += loss.item()
@@ -402,27 +468,37 @@ class ModelTrainer:
             print(f"Plot saved to {plot_filename}")
         plt.close(fig)  # Close the figure to free memory
 
-    def save_model(self, model_type="binary"):
+    def save_model(self, model_type="binary", model_architecture="resnet"):
         """
         Save the trained model
 
         Args:
-            model_type: Type of model ('binary', 'multiclass', or 'pretrained')
+            model_type: Type of model ('binary', 'multiclass')
+            model_architecture: Architecture of the model ('resnet', 'vit')
         """
         # Create the directory if it doesn't exist
-        base_dir = "../models/resnet"
+        base_dir = os.path.join(
+            "..", "models", model_architecture
+        )  # Use os.path.join for robustness
         save_dir = os.path.join(base_dir, model_type)
         os.makedirs(save_dir, exist_ok=True)
 
         # Save the model
+        model_filename = f"{model_architecture}_{model_type}_classifier.pth"
+        save_path = os.path.join(save_dir, model_filename)
         torch.save(
             {
                 "model_state_dict": self.model.state_dict(),
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "history": self.history,
                 "binary_classification": self.binary_classification,
+                # Optionally save model_architecture and model_type if needed for loading
+                "model_architecture": model_architecture,
+                "model_name_or_path": getattr(
+                    self.model, "model_name_or_path", None
+                ),  # Save if ViT model
             },
-            os.path.join(save_dir, f"resnet50_{model_type}_classifier.pth"),
+            save_path,
         )
 
-        print(f"Model saved to {save_dir}/resnet50_{model_type}_classifier.pth")
+        print(f"Model saved to {save_path}")

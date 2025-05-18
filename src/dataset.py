@@ -6,6 +6,8 @@ from PIL import Image
 import pandas as pd
 import torch
 import random
+from transformers import AutoImageProcessor
+
 
 class OxfordPetDataset(Dataset):
     """
@@ -62,28 +64,55 @@ class OxfordPetDataset(Dataset):
         if self.transform:
             image = self.transform(image)
 
-        return image, torch.tensor(label, dtype=torch.float32)
+        # Determine label dtype based on classification type and model target
+        # BCEWithLogitsLoss (binary) expects float labels. CrossEntropyLoss (multi-class) expects long labels.
+        label_dtype = torch.float32 if self.binary_classification else torch.long
+        return image, torch.tensor(label, dtype=label_dtype)
 
     @staticmethod
-    def _get_transforms():
+    def _get_transforms(data_augmentation=False):
         """
         Get image transformations for the Oxford Pet Dataset
+        Args:
+            data_augmentation: If True, returns transforms with augmentation for training
         Returns:
             transforms.Compose: Image transformations for ResNet50
         """
-        return transforms.Compose(
-            [
-                transforms.Resize(224),
-                transforms.CenterCrop(224),  # ResNet50 expects 224x224 input
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),  # ImageNet normalization
-            ]
-        )
+        if data_augmentation:
+            return transforms.Compose(
+                [
+                    transforms.Resize(256),  # Resize to slightly larger size
+                    transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),  # Random crop
+                    transforms.RandomHorizontalFlip(),  # Random horizontal flip
+                    transforms.RandomRotation(10),  # Random rotation up to 10 degrees
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    ),  # ImageNet normalization
+                ]
+            )
+        else:
+            return transforms.Compose(
+                [
+                    transforms.Resize(224),
+                    transforms.CenterCrop(224),  # ResNet50 expects 224x224 input
+                    transforms.ToTensor(),
+                    transforms.Normalize(
+                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    ),  # ImageNet normalization
+                ]
+            )
 
     @classmethod
-    def get_dataloaders(cls, data_dir, batch_size=32, binary_classification=True):
+    def get_dataloaders(
+        cls,
+        data_dir,
+        batch_size=32,
+        binary_classification=True,
+        data_augmentation=False,
+        model_type="resnet",
+        vit_model_name="google/vit-base-patch16-224",
+    ):
         """
         Get train, validation and test dataloaders for the Oxford Pet Dataset
 
@@ -91,6 +120,9 @@ class OxfordPetDataset(Dataset):
             data_dir: Path to the dataset directory
             batch_size: Batch size for the dataloaders
             binary_classification: If True, convert labels to binary (dog=1, cat=0)
+            data_augmentation: If True, applies augmentation to the training set (ResNet only)
+            model_type (str): "resnet" or "vit". Determines preprocessing.
+            vit_model_name (str): Hugging Face model name if model_type is "vit".
 
         Returns:
             train_loader: DataLoader for training data (80% of dataset)
@@ -98,29 +130,70 @@ class OxfordPetDataset(Dataset):
             test_loader: DataLoader for test data (10% of dataset)
             num_classes: Number of classes (1 for binary, 37 for multi-class)
         """
-        transform = cls._get_transforms()
-        dataset = cls(
+        current_transform = None
+        if model_type == "vit":
+            if not vit_model_name:
+                raise ValueError("vit_model_name must be provided for ViT model type")
+            print(f"\nUsing ViT image processor for {vit_model_name}...")
+            image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
+            # The transform will take a PIL image and return processed pixel_values tensor
+            # Squeeze(0) removes the batch dimension added by default by the processor when processing a single image.
+            current_transform = lambda pil_img: image_processor(
+                images=pil_img, return_tensors="pt"
+            )["pixel_values"].squeeze(0)
+        elif model_type == "resnet":
+            print(
+                "\nUsing ResNet image transforms (initially non-augmented for split)..."
+            )
+            # Base transform for the dataset to be split (val/test will use this)
+            current_transform = cls._get_transforms(data_augmentation=False)
+        else:
+            raise ValueError(f"Unsupported model_type: {model_type}")
+
+        # Main dataset object using the determined transform (non-augmented for ResNet here)
+        # This dataset instance will be used by val_dataset and test_dataset subsets.
+        dataset_for_splitting = cls(
             root_dir=data_dir,
-            transform=transform,
+            transform=current_transform,
             binary_classification=binary_classification,
         )
 
         # Calculate split sizes
-        total_size = len(dataset)
+        total_size = len(dataset_for_splitting)
         print(f"Total size of dataset: {total_size}")
         train_size = int(0.8 * total_size)
         val_size = int(0.1 * total_size)
         test_size = total_size - train_size - val_size
 
         # Split into train, validation and test sets (80-10-10 split)
-        train_dataset, val_dataset, test_dataset = random_split(
-            dataset, [train_size, val_size, test_size]
+        # These are Subset objects pointing to dataset_for_splitting
+        train_subset, val_subset, test_subset = random_split(
+            dataset_for_splitting, [train_size, val_size, test_size]
         )
 
+        # Prepare the final training dataset for the DataLoader
+        final_train_dataset = train_subset  # Default to the subset from the split
+
+        if data_augmentation and model_type == "resnet":
+            print("\nApplying data augmentation to the ResNet training set...")
+            # Create a new OxfordPetDataset instance with augmented transforms
+            augmented_dataset_source = cls(
+                root_dir=data_dir,
+                transform=cls._get_transforms(data_augmentation=True),
+                binary_classification=binary_classification,
+            )
+            # Create a new Subset using the indices from the original train_subset,
+            # but pointing to the newly created augmented_dataset_source.
+            final_train_dataset = torch.utils.data.Subset(
+                augmented_dataset_source, train_subset.indices
+            )
+
         # Create data loaders
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(
+            final_train_dataset, batch_size=batch_size, shuffle=True
+        )
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
         num_classes = 1 if binary_classification else 37
         return train_loader, val_loader, test_loader, num_classes
