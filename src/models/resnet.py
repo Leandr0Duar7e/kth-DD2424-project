@@ -56,10 +56,18 @@ class ResNet50(nn.Module):
         """Forward pass through the network"""
         return self.backbone(x)
     
-    def get_index_weighted_layers(self):
+    def get_index_weighted_layers(self, finetune_bn=True):
         layers = list(self.backbone.children())
 
-        param_layers = [i for i, layer in enumerate(layers) if any(True for _ in layer.parameters())]
+        if finetune_bn:
+            param_layers = [i for i, layer in enumerate(layers) if any(True for _ in layer.parameters())]
+        else:
+            param_layers = []
+            
+            for i, layer in enumerate(layers):
+                if not (isinstance(layer, nn.BatchNorm2d) or isinstance(layer, nn.BatchNorm1d)) and any(True for _ in layer.parameters()):
+                    param_layers.append(i)
+
 
         return param_layers
 
