@@ -624,7 +624,7 @@ def run_experiment_vit_multiclass_semi():
         labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
             data_dir="../data/raw",
             batch_size=batch_size_vit,
-            binary_classification=True,
+            binary_classification=False,
             model_type="vit",
             vit_model_name=vit_model_checkpoint,  
         )
