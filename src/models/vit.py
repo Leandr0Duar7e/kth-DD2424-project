@@ -1,6 +1,5 @@
-import torch
 import torch.nn as nn
-from transformers import ViTForImageClassification  # Using specific import for clarity
+from transformers import ViTForImageClassification
 
 
 class ViT(nn.Module):

@@ -112,6 +112,7 @@ class OxfordPetDataset(Dataset):
         data_augmentation=False,
         model_type="resnet",
         vit_model_name="google/vit-base-patch16-224",
+        random_seed=42,
     ):
         """
         Get train, validation and test dataloaders for the Oxford Pet Dataset
@@ -123,6 +124,7 @@ class OxfordPetDataset(Dataset):
             data_augmentation: If True, applies augmentation to the training set (ResNet only)
             model_type (str): "resnet" or "vit". Determines preprocessing.
             vit_model_name (str): Hugging Face model name if model_type is "vit".
+            random_seed (int): Seed for the random number generator for splitting.
 
         Returns:
             train_loader: DataLoader for training data (80% of dataset)
@@ -137,10 +139,11 @@ class OxfordPetDataset(Dataset):
             print(f"\nUsing ViT image processor for {vit_model_name}...")
             image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
             # The transform will take a PIL image and return processed pixel_values tensor
-            # Squeeze(0) removes the batch dimension added by default by the processor when processing a single image.
             current_transform = lambda pil_img: image_processor(
                 images=pil_img, return_tensors="pt"
-            )["pixel_values"].squeeze(0)
+            )["pixel_values"].squeeze(
+                0
+            )  # Squeeze(0) removes the batch dimension added by default by the processor when processing a single image.
         elif model_type == "resnet":
             print(
                 "\nUsing ResNet image transforms (initially non-augmented for split)..."
@@ -166,13 +169,15 @@ class OxfordPetDataset(Dataset):
         test_size = total_size - train_size - val_size
 
         # Split into train, validation and test sets (80-10-10 split)
-        # These are Subset objects pointing to dataset_for_splitting
+        generator = torch.Generator().manual_seed(random_seed)
         train_subset, val_subset, test_subset = random_split(
-            dataset_for_splitting, [train_size, val_size, test_size]
+            dataset_for_splitting,
+            [train_size, val_size, test_size],
+            generator=generator,
         )
 
         # Prepare the final training dataset for the DataLoader
-        final_train_dataset = train_subset  # Default to the subset from the split
+        final_train_dataset = train_subset
 
         if data_augmentation and model_type == "resnet":
             print("\nApplying data augmentation to the ResNet training set...")
