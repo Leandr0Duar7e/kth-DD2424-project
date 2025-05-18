@@ -12,6 +12,7 @@ from models.vit import ViT
 from trainer import ModelTrainer
 from dataset import OxfordPetDataset
 from utils import get_device, get_swedish_waiting_message, create_directories
+from utils import compute_class_weights, get_oversampled_loader
 
 import matplotlib
 
@@ -42,7 +43,8 @@ def display_experiment_options():
         "2. Multi-class classification of dogs and cats with ResNet50 (E.2)",
         "3. ViT binary classification (Dog vs Cat)",
         "4. ViT multi-class classification (37 Breeds)",
-        "5. Exit",
+        "5. ResNet50 multi-class classification (E.2) with an imbalanced training set",
+        "6. Exit",
     ]
 
     print("\nAvailable experiments:")
@@ -75,6 +77,7 @@ def run_experiment_1():
 
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
+        #PUT SOMEWHERE THE IMBALANCED
         # Load data
         print("\nLoading Oxford-IIIT Pet Dataset...")
         train_loader, val_loader, test_loader, num_classes = (
@@ -230,6 +233,69 @@ def run_experiment_1_semi_supervised():
                 test_loss,
             ]
         )
+
+def run_experiment_imbalanced_multiclass():
+    print("\n" + "=" * 70)
+    print("Starting experiment: ResNet50 MULTICLASS with imbalanced training set")
+    print("=" * 70)
+
+    print("\nStrategy options to handle imbalance:")
+    print("1. No strategy (baseline)")
+    print("2. Weighted CrossEntropyLoss")
+    print("3. Oversampling minority classes")
+
+    strategy = int(input("Choose strategy (1/2/3): ").strip())
+
+    user_input = int(
+                input(
+                    "\nInsert the number of layers to train (last layer excluded): "
+                )
+            )
+    # Load imbalanced data
+    train_loader, val_loader, test_loader, num_classes = OxfordPetDataset.get_dataloaders(
+        data_dir="../data/raw",
+        batch_size=32,
+        binary_classification=False,
+        apply_imbalance=True,
+    )
+
+    # Apply oversampling if selected
+    if strategy == 3:
+        print("Applying oversampling to rebalance classes...")
+        train_loader = get_oversampled_loader(train_loader.dataset, batch_size=32)
+
+    # Load model
+    print("\nInitializing ResNet50 model...")
+    for _ in tqdm(range(5), desc="Loading model"):
+        time.sleep(0.2)
+    model = ResNet50(binary_classification=False, freeze_backbone=True, num_train_layers=user_input)
+
+    device = get_device()
+
+    # Weighted loss
+    if strategy == 2:
+        print("Using weighted CrossEntropyLoss...")
+        class_weights = compute_class_weights(train_loader.dataset, num_classes).to(device)
+        loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+
+    # Create trainer
+    trainer = ModelTrainer(
+        model,
+        device,
+        binary_classification=False,
+        learning_rate=[1e-4],
+        loss_fn=loss_fn,
+    )
+
+    # Train
+    model, _ = trainer.train(train_loader, val_loader, num_epochs=3, print_graph=True)
+
+    # Evaluate
+    print("\nEvaluating on test set...")
+    test_loss, test_acc = trainer.evaluate(test_loader)
+    print(f"\nTest Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
 
 
 def run_experiment_2_semi_supervised():
@@ -874,6 +940,8 @@ def main():
         elif choice == 4:
             run_experiment_vit_multiclass()
         elif choice == 5:
+            run_experiment_imbalanced_multiclass()
+        elif choice == 6:
             print("\nExiting program. Goodbye!")
             sys.exit(0)
 

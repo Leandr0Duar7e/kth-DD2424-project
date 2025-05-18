@@ -26,6 +26,7 @@ class ModelTrainer:
         device,
         binary_classification=True,
         learning_rate=[5e-5],
+        loss_fn=None,
         lam=0.0,
         monitor_gradients=False,
         gradient_monitor_interval=100,
@@ -34,10 +35,17 @@ class ModelTrainer:
         self.model = model.to(device)
         self.device = device
         self.binary_classification = binary_classification
+        self.loss_fn = loss_fn
         self.finetune_bn = finetune_bn
         self.learning_rates = learning_rate
         self.weight_decay = lam
 
+        if self.loss_fn is None:
+            if self.binary_classification:
+                self.loss_fn = nn.BCEWithLogitsLoss()
+            else:
+                self.loss_fn = nn.CrossEntropyLoss()
+            
         # Apply batch normalization freezing if specified
         if not self.finetune_bn:
             self._freeze_bn_params()
