@@ -438,8 +438,8 @@ def run_experiment_vit_binary():
     print("=" * 70)
 
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = 3  # Example, can be configured
-    batch_size_vit = 32  # Adjust based on GPU memory
+    num_epochs_vit = 3  # can be configured
+    batch_size_vit = 32
 
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
@@ -476,16 +476,15 @@ def run_experiment_vit_binary():
             except ValueError:
                 print("Invalid input, using default interval 100.")
 
-        # Create trainer
-        # Note: ViT models often benefit from smaller learning rates e.g. 5e-5 or 2e-5
-        trainer = ModelTrainer(
-            model,
-            device,
-            binary_classification=True,
-            learning_rate=5e-5,
-            monitor_gradients=monitor_gradients,
-            gradient_monitor_interval=gradient_monitor_interval,
-        )
+    # Create trainer
+    trainer = ModelTrainer(
+        model,
+        device,
+        binary_classification=True,
+        learning_rate=[5e-5],
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
+    )
 
         # Display Swedish humor
         print(f"\n{get_swedish_waiting_message()}")
@@ -564,7 +563,7 @@ def run_experiment_vit_multiclass():
         model,
         device,
         binary_classification=False,
-        learning_rate=5e-5,
+        learning_rate=[5e-5],
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
     )
