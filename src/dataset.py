@@ -200,7 +200,9 @@ class OxfordPetDataset(Dataset):
         val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
         test_loader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
+        # Determine num_classes to return
         num_classes = 1 if binary_classification else 37
+
         return train_loader, val_loader, test_loader, num_classes
 
     @classmethod
@@ -222,7 +224,9 @@ class OxfordPetDataset(Dataset):
         if model_type == "vit":
             print(f"\nUsing ViT image processor for {vit_model_name}...")
             image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
-            base_transform = lambda pil_img: image_processor(images=pil_img, return_tensors="pt")["pixel_values"].squeeze(0)
+            base_transform = lambda pil_img: image_processor(
+                images=pil_img, return_tensors="pt"
+            )["pixel_values"].squeeze(0)
         else:
             print("\nUsing ResNet image transforms...")
             base_transform = cls._get_transforms(data_augmentation=False)
@@ -243,9 +247,9 @@ class OxfordPetDataset(Dataset):
 
         labeled_size = int(label_fraction * total_size)
         labeled_indices = indices[:labeled_size]
-        unlabeled_indices = indices[labeled_size:int(0.8 * total_size)]
-        val_indices = indices[int(0.8 * total_size):int(0.9 * total_size)]
-        test_indices = indices[int(0.9 * total_size):]
+        unlabeled_indices = indices[labeled_size : int(0.8 * total_size)]
+        val_indices = indices[int(0.8 * total_size) : int(0.9 * total_size)]
+        test_indices = indices[int(0.9 * total_size) :]
 
         # --- 4. Apply optional augmentation to labeled set only (for ResNet only) ---
         if model_type == "resnet" and data_augmentation:
@@ -256,7 +260,9 @@ class OxfordPetDataset(Dataset):
                 transform=augment_transform,
                 binary_classification=binary_classification,
             )
-            labeled_dataset = torch.utils.data.Subset(augmented_dataset, labeled_indices)
+            labeled_dataset = torch.utils.data.Subset(
+                augmented_dataset, labeled_indices
+            )
         else:
             labeled_dataset = torch.utils.data.Subset(full_dataset, labeled_indices)
 
@@ -265,8 +271,12 @@ class OxfordPetDataset(Dataset):
         test_dataset = torch.utils.data.Subset(full_dataset, test_indices)
 
         # --- 5. Create loaders ---
-        labeled_loader = DataLoader(labeled_dataset, batch_size=batch_size, shuffle=True)
-        unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=batch_size, shuffle=False)
+        labeled_loader = DataLoader(
+            labeled_dataset, batch_size=batch_size, shuffle=True
+        )
+        unlabeled_loader = DataLoader(
+            unlabeled_dataset, batch_size=batch_size, shuffle=False
+        )
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 

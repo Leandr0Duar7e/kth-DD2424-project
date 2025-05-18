@@ -5,6 +5,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, ConcatDataset
 
+
 class ModelTrainer:
     """
     A class to handle model training and evaluation
@@ -34,48 +35,52 @@ class ModelTrainer:
         self.device = device
         self.binary_classification = binary_classification
         self.finetune_bn = finetune_bn
-        self.learning_rates = learning_rate  
-        self.weight_decay = lam  
+        self.learning_rates = learning_rate
+        self.weight_decay = lam
 
         # Apply batch normalization freezing if specified
         if not self.finetune_bn:
             self._freeze_bn_params()
-            
 
         if len(learning_rate) == 1:
             learning_rate = learning_rate[0]
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=lam)
-            
+            self.optimizer = torch.optim.Adam(
+                self.model.parameters(), lr=learning_rate, weight_decay=lam
+            )
+
         else:
-            weighted_layers = self.model.get_index_weighted_layers(finetune_bn=finetune_bn)
+            weighted_layers = self.model.get_index_weighted_layers(
+                finetune_bn=finetune_bn
+            )
             weighted_layers.reverse()
-            
 
             backbone_layers = list(self.model.backbone.children())
-            
+
             param_groups = []
-            
+
             for i in range(len(backbone_layers)):
                 layer_params = list(backbone_layers[i].parameters())
-                
-                if i in weighted_layers:             
-                
-                    param_groups.append({
-                        "params": layer_params,
-                        "lr": learning_rate[weighted_layers.index(i)],
-                        "weight_decay": lam,
-                    })
-                
+
+                if i in weighted_layers:
+
+                    param_groups.append(
+                        {
+                            "params": layer_params,
+                            "lr": learning_rate[weighted_layers.index(i)],
+                            "weight_decay": lam,
+                        }
+                    )
+
                 else:
-                    param_groups.append({
-                        "params": layer_params,
-                        "lr": 1e-5,
-                        "weight_decay": lam,
-                    })
-            
-            
+                    param_groups.append(
+                        {
+                            "params": layer_params,
+                            "lr": 1e-5,
+                            "weight_decay": lam,
+                        }
+                    )
+
             self.optimizer = torch.optim.Adam(param_groups)
-            
 
         self.criterion = (
             nn.BCEWithLogitsLoss() if binary_classification else nn.CrossEntropyLoss()
@@ -95,15 +100,14 @@ class ModelTrainer:
         for module in self.model.modules():
             if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
                 module.eval()  # Set BN layers to evaluation mode
-                
+
                 for param in module.parameters():
-                    param.requires_grad = False            
-                     
+                    param.requires_grad = False
+
             for name, param in module.named_parameters():
                 if "bn" in name:
                     param.requires_grad = False
-                
-                    
+
     def _log_gradient_norms(self, epoch, batch_idx):
         """Logs the L2 norm of gradients for each parameter and the total norm."""
         print(f"--- Gradient Norms at Epoch {epoch+1}, Batch {batch_idx+1} ---")
@@ -123,12 +127,11 @@ class ModelTrainer:
         """
         Combine labeled and pseudo-labeled data into one DataLoader
         """
-        combined_dataset = ConcatDataset([
-            labeled_loader.dataset,
-            pseudo_loader.dataset
-        ])
+        combined_dataset = ConcatDataset(
+            [labeled_loader.dataset, pseudo_loader.dataset]
+        )
         return DataLoader(combined_dataset, batch_size=32, shuffle=True)
-    
+
     def evaluate(self, data_loader):
         """
         Evaluate the model on a dataset
@@ -183,7 +186,7 @@ class ModelTrainer:
         print(
             f" Start Training {self.model.__class__.__name__} for {num_epochs} epochs"
         )
-        
+
         if not self.finetune_bn:
             print("Batch normalization parameters are frozen (not being fine-tuned)")
 
@@ -204,9 +207,11 @@ class ModelTrainer:
                 self.model.train()
                 # Re-freeze BN layers as model.train() would have set them to train mode
                 for module in self.model.modules():
-                    if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
+                    if isinstance(module, nn.BatchNorm2d) or isinstance(
+                        module, nn.BatchNorm1d
+                    ):
                         module.eval()
-                        
+
             train_loss = 0.0
             train_correct = 0
             train_total = 0
@@ -249,12 +254,15 @@ class ModelTrainer:
                 current_loss = train_loss / (progress_bar.n + 1)
                 current_acc = 100 * train_correct / train_total
                 progress_bar.set_postfix(
-                    {"current_loss": f"{current_loss:.4f}", "current_acc": f"{current_acc:.2f}%"}
+                    {
+                        "current_loss": f"{current_loss:.4f}",
+                        "current_acc": f"{current_acc:.2f}%",
+                    }
                 )
 
             # Evaluate on train set
             train_loss, train_acc = self.evaluate(train_loader)
-            
+
             # Validation
             val_loss, val_acc = self.evaluate(val_loader)
 
@@ -299,7 +307,7 @@ class ModelTrainer:
         print(
             f" Start Training {self.model.__class__.__name__} with Gradual Unfreezing for {num_epochs} epochs"
         )
-        
+
         if not self.finetune_bn:
             print("Batch normalization parameters are frozen (not being fine-tuned)")
 
@@ -312,21 +320,26 @@ class ModelTrainer:
         }
 
         tot_num_steps = len(train_loader) * num_epochs
-        
+
         # Identify layers in the backbone (excluding the final classifier layer)
         if hasattr(self.model, "backbone") and self.model.backbone is not None:
-            
-            all_layers_in_backbone = list(self.model.backbone.children())[:-1]  # Exclude the final fc layer
 
-            param_layers_indices = self.model.get_index_weighted_layers(self.finetune_bn)[:-1]
-            
+            all_layers_in_backbone = list(self.model.backbone.children())[
+                :-1
+            ]  # Exclude the final fc layer
+
+            param_layers_indices = self.model.get_index_weighted_layers(
+                self.finetune_bn
+            )[:-1]
+
             actual_param_layers = []
-            
+
             for i in param_layers_indices:
                 actual_param_layers.append(all_layers_in_backbone[i])
-            
 
-            print(f"Identified {len(actual_param_layers)} parameter-containing layer groups in backbone to unfreeze gradually (fc already unfrozen).")
+            print(
+                f"Identified {len(actual_param_layers)} parameter-containing layer groups in backbone to unfreeze gradually (fc already unfrozen)."
+            )
 
             if (
                 not actual_param_layers or len(actual_param_layers) <= 1
@@ -349,9 +362,9 @@ class ModelTrainer:
                 for param in layer_module.parameters():
                     param.requires_grad = False
 
-            unfreeze_step_interval = tot_num_steps // (len(
-                actual_param_layers
-            ) + 1)   # unfreeze one layer group per interval
+            unfreeze_step_interval = tot_num_steps // (
+                len(actual_param_layers) + 1
+            )  # unfreeze one layer group per interval
             unfreeze_layer_group_idx_to_unfreeze = (
                 len(actual_param_layers) - 1
             )  # Start from the layer group closest to classifier
@@ -369,10 +382,10 @@ class ModelTrainer:
             else:
                 # If not fine-tuning BN, we need to set the model to train mode but keep BN in eval mode
                 self.model.train()
-                
+
                 # Re-freeze BN layers as model.train() would have set them to train mode
                 self._freeze_bn_params()
-                        
+
             train_loss = 0.0
             train_correct = 0
             train_total = 0
@@ -413,7 +426,10 @@ class ModelTrainer:
                 current_loss = train_loss / (progress_bar.n + 1)
                 current_acc = 100 * train_correct / train_total
                 progress_bar.set_postfix(
-                    {"curr_loss": f"{current_loss:.4f}", "curr_acc": f"{current_acc:.2f}%"}
+                    {
+                        "curr_loss": f"{current_loss:.4f}",
+                        "curr_acc": f"{current_acc:.2f}%",
+                    }
                 )
 
                 step_counter += 1
@@ -429,25 +445,23 @@ class ModelTrainer:
                     print(
                         f"\nUnfreezing layer group idx:{unfreeze_layer_group_idx_to_unfreeze} (step {step_counter}) name: {layer_to_unfreeze.__class__.__name__}"
                     )
-                    
+
                     for name, param in layer_to_unfreeze.named_parameters():
-                        if not param.requires_grad:  
+                        if not param.requires_grad:
                             if not self.finetune_bn:
                                 # BatchNorm parameter names in PyTorch always include "bn" by convention
                                 if "bn" not in name:
                                     param.requires_grad = True
                             else:
                                 param.requires_grad = True
-                    
-                    
-                    unfreeze_layer_group_idx_to_unfreeze -= 1
 
+                    unfreeze_layer_group_idx_to_unfreeze -= 1
 
             # Evaluate on train set
             train_loss, train_acc = self.evaluate(train_loader)
             # Evaluate on val set
             val_loss, val_acc = self.evaluate(val_loader)
-            
+
             self.history["train_loss"].append(train_loss)
             self.history["train_acc"].append(train_acc)
             self.history["val_loss"].append(val_loss)
@@ -486,10 +500,13 @@ class ModelTrainer:
 
         dataset = torch.utils.data.TensorDataset(
             torch.stack(pseudo_images),
-            torch.tensor(pseudo_labels, dtype=torch.float32 if self.binary_classification else torch.long),
+            torch.tensor(
+                pseudo_labels,
+                dtype=torch.float32 if self.binary_classification else torch.long,
+            ),
         )
         return DataLoader(dataset, batch_size=32, shuffle=True)
-    
+
     def _plot_history(self):
         if not self.history["train_loss"]:  # Check if history is empty
             print("No training history to plot.")
@@ -552,11 +569,8 @@ class ModelTrainer:
                 "history": self.history,
                 "binary_classification": self.binary_classification,
                 "finetune_bn": self.finetune_bn,  # Save BN fine-tuning setting
-                # Optionally save model_architecture and model_type if needed for loading
                 "model_architecture": model_architecture,
-                "model_name_or_path": getattr(
-                    self.model, "model_name_or_path", None
-                ),  # Save if ViT model
+                "model_name_or_path": getattr(self.model, "model_name_or_path", None),
             },
             save_path,
         )
