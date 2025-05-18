@@ -476,15 +476,15 @@ def run_experiment_vit_binary():
             except ValueError:
                 print("Invalid input, using default interval 100.")
 
-    # Create trainer
-    trainer = ModelTrainer(
-        model,
-        device,
-        binary_classification=True,
-        learning_rate=[5e-5],
-        monitor_gradients=monitor_gradients,
-        gradient_monitor_interval=gradient_monitor_interval,
-    )
+        # Create trainer
+        trainer = ModelTrainer(
+            model,
+            device,
+            binary_classification=True,
+            learning_rate=[5e-5],
+            monitor_gradients=monitor_gradients,
+            gradient_monitor_interval=gradient_monitor_interval,
+        )
 
         # Display Swedish humor
         print(f"\n{get_swedish_waiting_message()}")
