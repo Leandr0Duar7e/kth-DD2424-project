@@ -4,6 +4,7 @@ import sys
 import time
 import random
 from tqdm import tqdm
+import csv
 
 # Local imports
 from models.resnet import ResNet50
@@ -68,31 +69,100 @@ def run_experiment_1():
     print("Starting experiment 1: ResNet50 binary classification")
     print("=" * 70)
 
-    # Load data
-    print("\nLoading Oxford-IIIT Pet Dataset...")
-    train_loader, val_loader, test_loader, num_classes = (
-        OxfordPetDataset.get_dataloaders(
-            data_dir="../data/raw", batch_size=32, binary_classification=True
+    choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
+    if choice == "1":
+        # Load data
+        print("\nLoading Oxford-IIIT Pet Dataset...")
+        train_loader, val_loader, test_loader, num_classes = (
+            OxfordPetDataset.get_dataloaders(
+                data_dir="../data/raw", batch_size=32, binary_classification=True
+            )
         )
+        print(
+            f"Dataset loaded successfully! ({len(train_loader.dataset)} training samples)"
+        )
+
+        # Get number of layers to train
+        num_layers = int(
+            input("\nInsert the number of layers to train (last layer excluded): ")
+        )
+
+        # Load model
+        print("\nInitializing ResNet50 model...")
+        for _ in tqdm(range(5), desc="Loading model"):
+            time.sleep(0.5)  # Simulate loading time
+        model = ResNet50(
+            binary_classification=True, freeze_backbone=True, num_train_layers=num_layers
+        )
+
+        # Get device
+        device = get_device()
+        
+        # Ask for gradient monitoring
+        monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+        monitor_gradients = monitor_grads_choice == "y"
+        gradient_monitor_interval = 100  # Default
+        if monitor_gradients:
+            try:
+                interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+                if interval > 0:
+                    gradient_monitor_interval = interval
+                else:
+                    print("Invalid interval, using default 100.")
+            except ValueError:
+                print("Invalid input, using default interval 100.")
+
+        # Create trainer
+        trainer = ModelTrainer(
+            model,
+            device,
+            binary_classification=True,
+            monitor_gradients=monitor_gradients,
+            gradient_monitor_interval=gradient_monitor_interval,
+        )
+
+        # Display Swedish humor
+        print(f"\n{get_swedish_waiting_message()}")
+
+        # Train model
+        model, history = trainer.train(
+            train_loader, val_loader, num_epochs=3, print_graph=True
+        )
+
+        # Save model
+        save_choice = input("\nDo you want to save the model? (y/n): ").lower()
+        if save_choice == "y":
+            trainer.save_model(model_type="binary")
+
+        # Evaluate on test set
+        print("\nEvaluating model on test set...")
+        test_loss, test_acc = trainer.evaluate(test_loader)
+        print("\nFinal Test Results:")
+        print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.4f}%")
+
+        print("\nExperiment 1 completed!")
+    if choice == "2":
+        run_experiment_1_semi_supervised()
+    else:
+        print("Invalid option.")
+
+def run_experiment_1_semi_supervised():
+    print("\nRunning semi-supervised experiment (binary classification)...")
+
+    num_layers = int(input("Insert the number of layers to train (last layer excluded): "))
+    
+    label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
+    labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
+        data_dir="../data/raw",
+        batch_size=32,
+        label_fraction=label_fraction,
+        binary_classification=True,
     )
     print(
-        f"Dataset loaded successfully! ({len(train_loader.dataset)} training samples)"
-    )
+        f"Dataset loaded successfully! ({len(labeled_loader.dataset)} labeled samples and {len(unlabeled_loader.dataset)} unlabeled samples)"
+        )
 
-    # Get number of layers to train
-    num_layers = int(
-        input("\nInsert the number of layers to train (last layer excluded): ")
-    )
-
-    # Load model
-    print("\nInitializing ResNet50 model...")
-    for _ in tqdm(range(5), desc="Loading model"):
-        time.sleep(0.5)  # Simulate loading time
-    model = ResNet50(
-        binary_classification=True, freeze_backbone=True, num_train_layers=num_layers
-    )
-
-    # Get device
+    model = ResNet50(binary_classification=True, freeze_backbone=True, num_train_layers=num_layers)
     device = get_device()
 
     # Ask for gradient monitoring
@@ -118,135 +188,173 @@ def run_experiment_1():
         gradient_monitor_interval=gradient_monitor_interval,
     )
 
-    # Display Swedish humor
-    print(f"\n{get_swedish_waiting_message()}")
+    print("\nTraining on labeled subset...")
+    model, _ = trainer.train(labeled_loader, val_loader, num_epochs=3)
 
-    # Train model
-    model, history = trainer.train(
-        train_loader, val_loader, num_epochs=3, print_graph=True
+    print("\nGenerating pseudo-labels...")
+    pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
+
+    print("\nTraining on combined labeled + pseudo-labeled data...")
+    combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
+    model, _ = trainer.train(combined_loader, val_loader, num_epochs=3)
+
+    print("\nEvaluating final model on test set...")
+    test_loss, test_acc = trainer.evaluate(test_loader)
+    print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
+    
+    with open("semi_supervised_results.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Label fraction", label_fraction, "Test Acc", test_acc, "Test Loss", test_loss])
+
+def run_experiment_2_semi_supervised():
+    print("\nRunning semi-supervised experiment (multi-class classification)...")
+
+    label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
+    num_layers = int(input("Insert the number of layers to train (last layer excluded): "))
+
+    # Load semi-supervised splits
+    labeled_loader, unlabeled_loader, val_loader, test_loader = OxfordPetDataset.get_semi_supervised_loaders(
+        data_dir="../data/raw",
+        batch_size=32,
+        label_fraction=label_fraction,
+        binary_classification=False,
     )
 
-    # Save model
-    save_choice = input("\nDo you want to save the model? (y/n): ").lower()
-    if save_choice == "y":
-        trainer.save_model(model_type="binary")
+    model = ResNet50(binary_classification=False, freeze_backbone=True, num_train_layers=num_layers)
+    device = get_device()
+    trainer = ModelTrainer(model, device, binary_classification=False)
 
-    # Evaluate on test set
-    print("\nEvaluating model on test set...")
+    print("\nTraining on labeled subset...")
+    model, _ = trainer.train(labeled_loader, val_loader, num_epochs=3)
+
+    print("\nGenerating pseudo-labels...")
+    pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
+
+    print("\nTraining on combined labeled + pseudo-labeled data...")
+    combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
+    model, _ = trainer.train(combined_loader, val_loader, num_epochs=3)
+
+    print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
-    print("\nFinal Test Results:")
-    print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.4f}%")
+    print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
 
-    print("\nExperiment 1 completed!")
-
-
+    # Optional: Save results
+    import csv
+    with open("semi_supervised_results_multiclass.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Label fraction", label_fraction, "Test Acc", test_acc, "Test Loss", test_loss])
+        
 def run_experiment_2():
     """Run multi-class classification experiment"""
     print("\n" + "=" * 70)
     print("Starting experiment 2: ResNet50 multi-class classification")
     print("=" * 70)
+    choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
+    if choice == "1":
 
-    # Get number of layers to train
-    user_input = int(
-        input(
-            "\nSelect training option: \n n>0: train n layers \n '-1': gradually unfreeze each layer \n '-2': different learning rate for each layer and no data augmentation \n '-3': different learning rates for each layer and data augmentation"
+        # Get number of layers to train
+        user_input = int(
+            input(
+                "\nSelect training option: \n n>0: train n layers \n '-1': gradually unfreeze each layer \n '-2': different learning rate for each layer and no data augmentation \n '-3': different learning rates for each layer and data augmentation"
+            )
         )
-    )
 
-    # Load data
-    print("\nLoading Oxford-IIIT Pet Dataset for multi-class classification...")
-    train_loader, val_loader, test_loader, num_classes = (
-        OxfordPetDataset.get_dataloaders(
-            data_dir="../data/raw",
-            batch_size=32,
+        # Load data
+        print("\nLoading Oxford-IIIT Pet Dataset for multi-class classification...")
+        train_loader, val_loader, test_loader, num_classes = (
+            OxfordPetDataset.get_dataloaders(
+                data_dir="../data/raw",
+                batch_size=32,
+                binary_classification=False,
+                data_augmentation=True if user_input == -3 else False,
+            )
+        )
+        print(
+            f"Dataset loaded successfully! ({len(train_loader.dataset)} training samples)"
+        )
+
+        # Load model
+        print("\nInitializing ResNet50 model...")
+        for _ in tqdm(range(5), desc="Loading model"):
+            time.sleep(0.5)  # Simulate loading time
+
+        if user_input == -2 or user_input == -3:
+            # For gradual unfreezing, backbone is initially frozen, and trainer handles unfreezing
+            model = ResNet50(
+                binary_classification=False,
+                freeze_backbone=False,  # Important: Trainer will unfreeze layers gradually
+                num_train_layers=0,  # Initially, only classifier is unfrozen by ResNet50 class
+            )
+        else:
+
+            model = ResNet50(
+                binary_classification=False,
+                freeze_backbone=True,  # ResNet50 handles unfreezing based on num_train_layers
+                num_train_layers=user_input if user_input > 0 else 0,
+            )
+
+        # Get device
+        device = get_device()
+
+        # Ask for gradient monitoring
+        monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
+        monitor_gradients = monitor_grads_choice == "y"
+        gradient_monitor_interval = 100  # Default
+        if monitor_gradients:
+            try:
+                interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
+                if interval > 0:
+                    gradient_monitor_interval = interval
+                else:
+                    print("Invalid interval, using default 100.")
+            except ValueError:
+                print("Invalid input, using default interval 100.")
+
+        # Create trainer
+        if user_input == -2 or user_input == -3:  # Different learning rates for each layer
+            learning_rates = [1e-3, 5e-4, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7, 5e-8]
+        else:
+            learning_rates = [0.001]
+        trainer = ModelTrainer(
+            model,
+            device,
             binary_classification=False,
-            data_augmentation=True if user_input == -3 else False,
+            learning_rate=learning_rates,
+            monitor_gradients=monitor_gradients,
+            gradient_monitor_interval=gradient_monitor_interval,
         )
-    )
-    print(
-        f"Dataset loaded successfully! ({len(train_loader.dataset)} training samples)"
-    )
 
-    # Load model
-    print("\nInitializing ResNet50 model...")
-    for _ in tqdm(range(5), desc="Loading model"):
-        time.sleep(0.5)  # Simulate loading time
+        # Display Swedish humor
+        print(f"\n{get_swedish_waiting_message()}")
 
-    if user_input == -2 or user_input == -3:
-        # For gradual unfreezing, backbone is initially frozen, and trainer handles unfreezing
-        model = ResNet50(
-            binary_classification=False,
-            freeze_backbone=False,  # Important: Trainer will unfreeze layers gradually
-            num_train_layers=0,  # Initially, only classifier is unfrozen by ResNet50 class
-        )
+        # Train model
+        if user_input == -1:
+            print("\nStarting training with Gradual Unfreezing...")
+            model, history = trainer.train_gradual_unfreezing(
+                train_loader, val_loader, num_epochs=3, print_graph=True
+            )
+        else:
+
+            # TODO: ADD LEARNING RATES
+            model, history = trainer.train(
+                train_loader, val_loader, num_epochs=3, print_graph=True
+            )
+
+        # Save model
+        save_choice = input("\nDo you want to save the model? (y/n): ").lower()
+        if save_choice == "y":
+            trainer.save_model(model_type="multiclass")
+
+        # Evaluate on test set
+        print("\nEvaluating model on test set...")
+        test_loss, test_acc = trainer.evaluate(test_loader)
+        print("\nFinal Test Results:")
+        print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%")
+        print("\nExperiment 2 completed!")
+    elif choice == "2":
+        run_experiment_2_semi_supervised()
     else:
-
-        model = ResNet50(
-            binary_classification=False,
-            freeze_backbone=True,  # ResNet50 handles unfreezing based on num_train_layers
-            num_train_layers=user_input if user_input > 0 else 0,
-        )
-
-    # Get device
-    device = get_device()
-
-    # Ask for gradient monitoring
-    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
-    monitor_gradients = monitor_grads_choice == "y"
-    gradient_monitor_interval = 100  # Default
-    if monitor_gradients:
-        try:
-            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
-            if interval > 0:
-                gradient_monitor_interval = interval
-            else:
-                print("Invalid interval, using default 100.")
-        except ValueError:
-            print("Invalid input, using default interval 100.")
-
-    # Create trainer
-    if user_input == -2 or user_input == -3:  # Different learning rates for each layer
-        learning_rates = [1e-3, 5e-4, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7, 5e-8]
-    else:
-        learning_rates = [0.001]
-    trainer = ModelTrainer(
-        model,
-        device,
-        binary_classification=False,
-        learning_rate=learning_rates,
-        monitor_gradients=monitor_gradients,
-        gradient_monitor_interval=gradient_monitor_interval,
-    )
-
-    # Display Swedish humor
-    print(f"\n{get_swedish_waiting_message()}")
-
-    # Train model
-    if user_input == -1:
-        print("\nStarting training with Gradual Unfreezing...")
-        model, history = trainer.train_gradual_unfreezing(
-            train_loader, val_loader, num_epochs=3, print_graph=True
-        )
-    else:
-
-        # TODO: ADD LEARNING RATES
-        model, history = trainer.train(
-            train_loader, val_loader, num_epochs=3, print_graph=True
-        )
-
-    # Save model
-    save_choice = input("\nDo you want to save the model? (y/n): ").lower()
-    if save_choice == "y":
-        trainer.save_model(model_type="multiclass")
-
-    # Evaluate on test set
-    print("\nEvaluating model on test set...")
-    test_loss, test_acc = trainer.evaluate(test_loader)
-    print("\nFinal Test Results:")
-    print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%")
-
-    print("\nExperiment 2 completed!")
-
+        print("Invalid option.")
 
 def run_experiment_vit_binary():
     """Run ViT binary classification experiment"""
