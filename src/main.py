@@ -44,7 +44,8 @@ def display_experiment_options():
         "3. ViT binary classification (Dog vs Cat)",
         "4. ViT multi-class classification (37 Breeds)",
         "5. ResNet50 multi-class classification (E.2) with an imbalanced training set",
-        "6. Exit",
+        "6. ViT multi-class classification with an imbalanced training set",
+        "7. Exit",
     ]
 
     print("\nAvailable experiments:")
@@ -832,6 +833,110 @@ def run_experiment_vit_multiclass_semi():
         f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%"
     )  # .2f for multiclass as in run_exp2
 
+def run_experiment_vit_multiclass_imbalanced():
+    print("\n" + "=" * 70)
+    print("Starting experiment: ViT MULTICLASS with imbalanced training set")
+    print("=" * 70)
+    
+    vit_model_checkpoint = "google/vit-base-patch16-224"
+    num_epochs_vit = 3  # Example, can be configured. More epochs might be needed for multi-class.
+    batch_size_vit = 32  # Adjust based on GPU memory
+
+    print("\nStrategy options to handle imbalance:")
+    print("1. No strategy (baseline)")
+    print("2. Weighted CrossEntropyLoss")
+    print("3. Oversampling minority classes")
+    
+    strategy = int(input("Choose strategy (1/2/3): ").strip())
+    vit_model_checkpoint = "google/vit-base-patch16-224"
+    num_epochs_vit = 3
+    batch_size = 32
+    
+    # Load data
+    train_loader, val_loader, test_loader, num_classes = OxfordPetDataset.get_dataloaders(
+        data_dir="../data/raw",
+        batch_size=batch_size_vit,
+        binary_classification=False,
+        model_type="vit",
+        vit_model_name=vit_model_checkpoint,
+        apply_imbalance=True,
+    )
+    print(
+        f"Dataset loaded for ViT multi-class classification! ({len(train_loader.dataset)} training samples)"
+    )
+    
+    if strategy == 3:
+        print("Applying oversampling to rebalance classes...")
+        train_loader = get_oversampled_loader(train_loader.dataset, batch_size=batch_size)
+    
+    # Load model
+    print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
+    model = ViT(
+        model_name_or_path=vit_model_checkpoint, binary_classification=False
+    )
+
+    # Get device
+    device = get_device()
+
+    # Use class weights if selected
+    if strategy == 2:
+        print("Using weighted CrossEntropyLoss...")
+        class_weights = compute_class_weights(train_loader.dataset, num_classes).to(device)
+        loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+        
+    # Ask for gradient monitoring
+    monitor_grads_choice = input(
+        "\nDo you want to monitor gradients? (y/n): "
+    ).lower()
+    monitor_gradients = monitor_grads_choice == "y"
+    gradient_monitor_interval = 100  # Default
+    if monitor_gradients:
+        try:
+            interval = int(
+                input("Monitor gradients every N batches (e.g., 50, 100): ")
+            )
+            if interval > 0:
+                gradient_monitor_interval = interval
+            else:
+                print("Invalid interval, using default 100.")
+        except ValueError:
+            print("Invalid input, using default interval 100.")
+
+    # Create trainer
+    trainer = ModelTrainer(
+        model,
+        device,
+        binary_classification=False,
+        learning_rate=[5e-5],
+        monitor_gradients=monitor_gradients,
+        gradient_monitor_interval=gradient_monitor_interval,
+        loss_fn=loss_fn,
+    )
+
+    # Display Swedish humor
+    print(f"\n{get_swedish_waiting_message()}")
+
+    # Train model
+    # For multi-class ViT, gradual unfreezing could be explored later if needed.
+    # For now, standard fine-tuning.
+    model, _ = trainer.train(
+        train_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
+    )
+
+    # Save model
+    save_choice = input("\nDo you want to save the model? (y/n): ").lower()
+    if save_choice == "y":
+        trainer.save_model(model_type="multiclass", model_architecture="vit")
+
+    # Evaluate on test set
+    print("\nEvaluating ViT model on test set...")
+    test_loss, test_acc = trainer.evaluate(test_loader)
+    print("\nFinal Test Results (ViT Multi-class):")
+    print(
+        f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%"
+    )
 
 def run_experiment_vit_multiclass():
     """Run ViT multi-class classification experiment"""
@@ -942,6 +1047,8 @@ def main():
         elif choice == 5:
             run_experiment_imbalanced_multiclass()
         elif choice == 6:
+            run_experiment_vit_multiclass_imbalanced()
+        elif choice == 7:
             print("\nExiting program. Goodbye!")
             sys.exit(0)
 
