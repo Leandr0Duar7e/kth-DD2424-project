@@ -323,7 +323,6 @@ class ModelTrainer:
                     {
                         "current_loss": f"{current_loss:.4f}",
                         "current_acc": f"{current_acc:.2f}%",
-                        "lr": f"{current_lr:.2e}",
                     }
                 )
 
