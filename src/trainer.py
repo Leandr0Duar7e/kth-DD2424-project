@@ -18,6 +18,10 @@ class ModelTrainer:
         monitor_gradients (bool): If True, logs gradient norms during training.
         gradient_monitor_interval (int): Interval (in batches) for logging gradient norms.
         finetune_bn (bool): If True, batch normalization parameters will be fine-tuned during training.
+        use_scheduler (bool): If True, uses OneCycleLR scheduler with warm-up and cosine annealing.
+        scheduler_params (dict): Parameters for the scheduler:
+            - max_lr: Maximum learning rate to reach during training
+            - pct_start: Percentage of training for warm-up (default: 0.3)
     """
 
     def __init__(
@@ -31,6 +35,8 @@ class ModelTrainer:
         monitor_gradients=False,
         gradient_monitor_interval=100,
         finetune_bn=True,
+        use_scheduler=False,
+        scheduler_params=None,
     ):
         self.model = model.to(device)
         self.device = device
@@ -39,6 +45,8 @@ class ModelTrainer:
         self.finetune_bn = finetune_bn
         self.learning_rates = learning_rate
         self.weight_decay = lam
+        self.use_scheduler = use_scheduler
+        self.scheduler_params = scheduler_params or {}
 
         if self.loss_fn is None:
             if self.binary_classification:
@@ -90,6 +98,9 @@ class ModelTrainer:
 
             self.optimizer = torch.optim.Adam(param_groups)
 
+        # Initialize scheduler if requested (will be properly initialized in train())
+        self.scheduler = None
+
         self.criterion = (
             nn.BCEWithLogitsLoss() if binary_classification else nn.CrossEntropyLoss()
         )
@@ -98,6 +109,7 @@ class ModelTrainer:
             "train_acc": [],
             "val_loss": [],
             "val_acc": [],
+            "learning_rates": [],
         }
         self.monitor_gradients = monitor_gradients
         self.gradient_monitor_interval = gradient_monitor_interval
@@ -198,12 +210,50 @@ class ModelTrainer:
         if not self.finetune_bn:
             print("Batch normalization parameters are frozen (not being fine-tuned)")
 
+        if self.use_scheduler:
+            print("Using OneCycleLR scheduler with warm-up and cosine annealing")
+            steps_per_epoch = len(train_loader)
+            total_steps = steps_per_epoch * num_epochs
+            
+            # Handle multiple learning rates
+            if isinstance(self.learning_rates, list) and len(self.learning_rates) > 1:
+                print("Multiple learning rates detected for different parameter groups")
+                # Get the base learning rates for each parameter group
+                base_lrs = [group['lr'] for group in self.optimizer.param_groups]
+                # Calculate max_lrs for each group (10x their base learning rate)
+                max_lrs = [lr * 10 for lr in base_lrs]
+                
+                print("Learning rate ranges for each parameter group:")
+                for i, (base_lr, max_lr) in enumerate(zip(base_lrs, max_lrs)):
+                    print(f"Group {i}: {base_lr:.2e} -> {max_lr:.2e}")
+            else:
+                # Single learning rate case
+                base_lr = self.optimizer.param_groups[0]['lr']
+                max_lr = self.scheduler_params.get('max_lr', base_lr * 10)
+                max_lrs = [max_lr]  # OneCycleLR expects a list even for single lr
+                print(f"Base learning rate: {base_lr:.2e}")
+                print(f"Maximum learning rate: {max_lr:.2e}")
+            
+            pct_start = self.scheduler_params.get('pct_start', 0.3)
+            print(f"Warm-up percentage: {pct_start*100:.0f}%")
+            
+            self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                max_lr=max_lrs,  # Now handles both single and multiple learning rates
+                total_steps=total_steps,
+                pct_start=pct_start,
+                anneal_strategy='cos',
+                div_factor=25.0,
+                final_div_factor=10000.0,
+            )
+
         # Reset history for a new training session
         self.history = {
             "train_loss": [],
             "train_acc": [],
             "val_loss": [],
             "val_acc": [],
+            "learning_rates": [],
         }
 
         for epoch in range(num_epochs):
@@ -249,6 +299,14 @@ class ModelTrainer:
 
                 self.optimizer.step()
 
+                # Step the scheduler (per batch)
+                if self.use_scheduler:
+                    self.scheduler.step()
+                    current_lr = self.scheduler.get_last_lr()[0]
+                    self.history["learning_rates"].append(current_lr)
+                    #if batch_idx % 10 == 0:  # Print every 10 batches to avoid too much output
+                    #progress_bar.set_postfix({"lr": f"{current_lr:.2e}"})
+
                 train_loss += loss.item()
                 predicted = (
                     (torch.sigmoid(outputs) > 0.5).float()
@@ -265,6 +323,7 @@ class ModelTrainer:
                     {
                         "current_loss": f"{current_loss:.4f}",
                         "current_acc": f"{current_acc:.2f}%",
+                        "lr": f"{current_lr:.2e}",
                     }
                 )
 
@@ -319,12 +378,51 @@ class ModelTrainer:
         if not self.finetune_bn:
             print("Batch normalization parameters are frozen (not being fine-tuned)")
 
+        # Initialize scheduler if requested
+        if self.use_scheduler:
+            print("Using OneCycleLR scheduler with warm-up and cosine annealing")
+            steps_per_epoch = len(train_loader)
+            total_steps = steps_per_epoch * num_epochs
+            
+            # Handle multiple learning rates
+            if isinstance(self.learning_rates, list) and len(self.learning_rates) > 1:
+                print("Multiple learning rates detected for different parameter groups")
+                # Get the base learning rates for each parameter group
+                base_lrs = [group['lr'] for group in self.optimizer.param_groups]
+                # Calculate max_lrs for each group (10x their base learning rate)
+                max_lrs = [lr * 10 for lr in base_lrs]
+                
+                print("Learning rate ranges for each parameter group:")
+                for i, (base_lr, max_lr) in enumerate(zip(base_lrs, max_lrs)):
+                    print(f"Group {i}: {base_lr:.2e} -> {max_lr:.2e}")
+            else:
+                # Single learning rate case
+                base_lr = self.optimizer.param_groups[0]['lr']
+                max_lr = self.scheduler_params.get('max_lr', base_lr * 10)
+                max_lrs = [max_lr]  # OneCycleLR expects a list even for single lr
+                print(f"Base learning rate: {base_lr:.2e}")
+                print(f"Maximum learning rate: {max_lr:.2e}")
+            
+            pct_start = self.scheduler_params.get('pct_start', 0.3)
+            print(f"Warm-up percentage: {pct_start*100:.0f}%")
+            
+            self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                max_lr=max_lrs,
+                total_steps=total_steps,
+                pct_start=pct_start,
+                anneal_strategy='cos',
+                div_factor=25.0,
+                final_div_factor=10000.0,
+            )
+
         # Reset history for a new training session
         self.history = {
             "train_loss": [],
             "train_acc": [],
             "val_loss": [],
             "val_acc": [],
+            "learning_rates": [],  # Add this to track learning rates
         }
 
         tot_num_steps = len(train_loader) * num_epochs
@@ -422,6 +520,12 @@ class ModelTrainer:
 
                 self.optimizer.step()
 
+                # Step the scheduler (per batch)
+                if self.use_scheduler:
+                    self.scheduler.step()
+                    current_lr = self.scheduler.get_last_lr()[0]
+                    self.history["learning_rates"].append(current_lr)
+                    
                 train_loss += loss.item()
                 predicted = (
                     (torch.sigmoid(outputs) > 0.5).float()
@@ -520,7 +624,7 @@ class ModelTrainer:
             print("No training history to plot.")
             return
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 5))
 
         # Plot loss
         ax1.plot(self.history["train_loss"], label="Train Loss")
@@ -539,6 +643,16 @@ class ModelTrainer:
         ax2.set_title("Training and Validation Accuracy")
         ax2.legend()
         ax2.grid(True)
+
+        # Plot learning rate
+        if self.use_scheduler and self.history["learning_rates"]:
+            ax3.plot(self.history["learning_rates"], label="Learning Rate")
+            ax3.set_xlabel("Epoch")
+            ax3.set_ylabel("Learning Rate")
+            ax3.set_title("Learning Rate Schedule")
+            ax3.legend()
+            ax3.grid(True)
+            ax3.set_yscale('log')  # Use log scale for better visualization
 
         plt.tight_layout()
         # Try to show plot, but handle environments where it might fail (e.g., headless server)
