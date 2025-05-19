@@ -53,7 +53,7 @@ class ModelTrainer:
                 self.loss_fn = nn.BCEWithLogitsLoss()
             else:
                 self.loss_fn = nn.CrossEntropyLoss()
-            
+
         # Apply batch normalization freezing if specified
         if not self.finetune_bn:
             self._freeze_bn_params()
@@ -605,24 +605,36 @@ class ModelTrainer:
             print(f"Plot saved to {plot_filename}")
         plt.close(fig)  # Close the figure to free memory
 
-    def save_model(self, model_type="binary", model_architecture="resnet"):
+    def save_model(
+        self, model_type="binary", model_architecture="resnet", full_save_path=None
+    ):
         """
         Save the trained model
 
         Args:
             model_type: Type of model ('binary', 'multiclass')
             model_architecture: Architecture of the model ('resnet', 'vit')
+            full_save_path: Optional. Full path (including filename) to save the model.
+                           If None, constructs path based on model_type and model_architecture.
         """
-        # Create the directory if it doesn't exist
-        base_dir = os.path.join(
-            "..", "models", model_architecture
-        )  # Use os.path.join for robustness
-        save_dir = os.path.join(base_dir, model_type)
-        os.makedirs(save_dir, exist_ok=True)
+        save_path = full_save_path
+        if save_path:
+            # Ensure the directory for the custom path exists
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        else:
+            # Fallback to original behavior if full_save_path is not provided
+            print(
+                "Warning: full_save_path not provided to save_model. Using default naming and location."
+            )
+            base_dir = os.path.join(
+                "..", "models", model_architecture
+            )  # Use os.path.join for robustness
+            save_dir = os.path.join(base_dir, model_type)
+            os.makedirs(save_dir, exist_ok=True)
+            model_filename = f"{model_architecture}_{model_type}_classifier_fallback.pth"  # Added fallback to distinguish
+            save_path = os.path.join(save_dir, model_filename)
 
         # Save the model
-        model_filename = f"{model_architecture}_{model_type}_classifier.pth"
-        save_path = os.path.join(save_dir, model_filename)
         torch.save(
             {
                 "model_state_dict": self.model.state_dict(),
