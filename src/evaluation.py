@@ -13,6 +13,7 @@ from sklearn.metrics import (
 )
 import pandas as pd
 import numpy as np
+import csv
 
 # Assuming dataset.py, models/resnet.py, models/vit.py are accessible from this script's location
 # If src is in PYTHONPATH or running from src/, these should work.
@@ -23,35 +24,38 @@ from models.vit import ViT
 
 class ModelEvaluator:
     def __init__(
-        self, model_path, device, data_dir, batch_size=32, results_dir="../evaluation"
+        self,
+        model_path,
+        device,
+        data_dir,
+        batch_size=32,
+        evaluation_run_specific_dir=None,
     ):
         self.model_path = model_path
         self.device = device
         self.data_dir = data_dir
         self.batch_size = batch_size
-        self.results_dir = results_dir
+        # self.results_dir = results_dir # Removed, specific dir is now passed
 
-        print(f"DEBUG: Initializing ModelEvaluator for {self.model_path}")
+        # print(f"DEBUG: Initializing ModelEvaluator for {self.model_path}")
 
         try:
             self.checkpoint = torch.load(self.model_path, map_location=self.device)
-            print(f"DEBUG: Checkpoint loaded successfully for {self.model_path}.")
-            print(f"DEBUG: self.checkpoint type: {type(self.checkpoint)}")
+            # print(f"DEBUG: Checkpoint loaded successfully for {self.model_path}.")
+            # print(f"DEBUG: self.checkpoint type: {type(self.checkpoint)}")
             if self.checkpoint is None:
                 raise FileNotFoundError(
                     f"Checkpoint data is None after loading {self.model_path}"
                 )
-            print(
-                f"DEBUG: self.checkpoint keys (first level): {list(self.checkpoint.keys()) if isinstance(self.checkpoint, dict) else 'Not a dict'}"
-            )
+            # print(
+            # f"DEBUG: self.checkpoint keys (first level): {list(self.checkpoint.keys()) if isinstance(self.checkpoint, dict) else 'Not a dict'}"
+            # )
         except FileNotFoundError as e:
-            print(
-                f"ERROR_DEBUG: Could not load checkpoint: {self.model_path}. Error: {e}"
-            )
+            print(f"ERROR: Could not load checkpoint: {self.model_path}. Error: {e}")
             raise  # Re-raise the exception to stop further execution
         except Exception as e:
             print(
-                f"ERROR_DEBUG: An unexpected error occurred while loading checkpoint {self.model_path}. Error: {e}"
+                f"ERROR: An unexpected error occurred while loading checkpoint {self.model_path}. Error: {e}"
             )
             raise  # Re-raise for critical failure
 
@@ -61,44 +65,62 @@ class ModelEvaluator:
         )  # Default based on original project
         self.model_name_or_path = self.checkpoint.get("model_name_or_path")  # For ViT
 
-        print(f"DEBUG: Model architecture from checkpoint: {self.model_architecture}")
-        print(
-            f"DEBUG: Is binary classification from checkpoint: {self.is_binary_classification}"
-        )
-        print(
-            f"DEBUG: ViT model_name_or_path from checkpoint: {self.model_name_or_path}"
-        )
+        # print(f"DEBUG: Model architecture from checkpoint: {self.model_architecture}")
+        # print(
+        #     f"DEBUG: Is binary classification from checkpoint: {self.is_binary_classification}"
+        # )
+        # print(
+        #     f"DEBUG: ViT model_name_or_path from checkpoint: {self.model_name_or_path}"
+        # )
 
         self.model_filename = os.path.basename(self.model_path)
-        self.evaluation_subdir = os.path.join(
-            self.results_dir, os.path.splitext(self.model_filename)[0]
-        )
+
+        if evaluation_run_specific_dir is None:
+            # This case should ideally not be hit if called from perform_and_save_evaluation
+            project_root = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..")
+            )
+            fallback_dir_base = os.path.join(
+                project_root,
+                "evaluation",
+                self.model_architecture,
+                "binary" if self.is_binary_classification else "multiclass",
+            )
+            self.evaluation_subdir = os.path.join(
+                fallback_dir_base, os.path.splitext(self.model_filename)[0]
+            )
+            print(
+                f"WARNING: evaluation_run_specific_dir not provided to ModelEvaluator, using fallback: {self.evaluation_subdir}"
+            )
+        else:
+            self.evaluation_subdir = evaluation_run_specific_dir
+
         os.makedirs(self.evaluation_subdir, exist_ok=True)
-        print(f"DEBUG: Evaluation subdirectory: {self.evaluation_subdir}")
+        # print(f"DEBUG: Evaluation artifacts will be saved to: {self.evaluation_subdir}")
 
         # self.num_classes will be set by _load_model_and_set_classes
         # self.class_names will be set by _get_test_dataloader
         self.model, self.num_classes = self._load_model_and_set_classes()
 
         if self.model:
-            print(f"DEBUG: Model loaded and num_classes set to: {self.num_classes}")
+            # print(f"DEBUG: Model loaded and num_classes set to: {self.num_classes}")
             self.test_loader, self.class_names = self._get_test_dataloader()
-            print(
-                f"DEBUG: Test dataloader and class_names ({self.class_names}) obtained."
-            )
+            # print(
+            #     f"DEBUG: Test dataloader and class_names ({self.class_names}) obtained."
+            # )
         else:
             print(
-                f"ERROR_DEBUG: Model could not be loaded in __init__. Aborting further setup for {self.model_path}."
+                f"ERROR: Model could not be loaded in __init__. Aborting further setup for {self.model_path}."
             )
             # Handle cases where model loading might fail gracefully if needed, or ensure _load_model_and_set_classes raises
             self.test_loader = None
             self.class_names = []
 
     def _load_model_and_set_classes(self):
-        print(f"DEBUG: Entering _load_model_and_set_classes for {self.model_path}")
+        # print(f"DEBUG: Entering _load_model_and_set_classes for {self.model_path}")
         if not self.checkpoint or not isinstance(self.checkpoint, dict):
             print(
-                f"ERROR_DEBUG: Checkpoint not loaded or not a dict in _load_model_and_set_classes for {self.model_path}."
+                f"ERROR: Checkpoint not loaded or not a dict in _load_model_and_set_classes for {self.model_path}."
             )
             raise ValueError(
                 "Checkpoint not loaded correctly before calling _load_model_and_set_classes."
@@ -107,18 +129,18 @@ class ModelEvaluator:
         state_dict = self.checkpoint.get("model_state_dict")
         if not state_dict:
             print(
-                f"ERROR_DEBUG: model_state_dict not found in checkpoint for {self.model_path}"
+                f"ERROR: model_state_dict not found in checkpoint for {self.model_path}"
             )
             raise ValueError(
                 f"model_state_dict not found in checkpoint: {self.model_path}"
             )
-        print(f"DEBUG: model_state_dict obtained. Keys count: {len(state_dict.keys())}")
+        # print(f"DEBUG: model_state_dict obtained. Keys count: {len(state_dict.keys())}")
 
         num_classes = 0
         loaded_model = None
 
         if self.model_architecture == "resnet":
-            print(f"DEBUG: Loading ResNet model from checkpoint.")
+            # print(f"DEBUG: Loading ResNet model from checkpoint.")
             determined_key_name = None
             last_layer_weights = None
 
@@ -137,51 +159,42 @@ class ModelEvaluator:
                         break
 
             if determined_key_name:
-                print(f"DEBUG: ResNet classifier key: '{determined_key_name}'")
+                # print(f"DEBUG: ResNet classifier key: '{determined_key_name}'")
                 last_layer_weights = state_dict[determined_key_name]
                 num_classes = last_layer_weights.shape[0]
                 # Use self.is_binary_classification which is read from the checkpoint
                 # freeze_backbone=False as we are loading a saved model for evaluation, not training setup
-                print(
-                    f"DEBUG: Initializing ResNet50 with binary_classification={self.is_binary_classification} (derived from checkpoint)"
-                )
+                # print(
+                #     f"DEBUG: Initializing ResNet50 with binary_classification={self.is_binary_classification} (derived from checkpoint)"
+                # )
                 loaded_model = ResNet50(
                     binary_classification=self.is_binary_classification,
-                    freeze_backbone=False,
+                    freeze_backbone=False,  # For eval, backbone state is as saved
                 )
-                print(
-                    f"DEBUG: ResNet initialized. Expected num classes by model init: {'1 (binary)' if self.is_binary_classification else '37 (multiclass)'}. Actual from checkpoint: {num_classes}"
-                )
+                # print(
+                #     f"DEBUG: ResNet initialized. Expected num classes by model init: {'1 (binary)' if self.is_binary_classification else '37 (multiclass)'}. Actual from checkpoint: {num_classes}"
+                # )
 
-                # Sanity check if the model's internal num_classes matches what we found
-                # The ResNet50 class sets its fc layer based on binary_classification flag.
-                # If binary_classification is True, fc_output_features is 1.
-                # If binary_classification is False, fc_output_features is 37.
                 expected_fc_output_features = 1 if self.is_binary_classification else 37
                 if num_classes != expected_fc_output_features:
-                    # This can happen if a binary model was saved with 2 output neurons (e.g. for CrossEntropyLoss with 2 classes)
-                    # but our ResNet50 class definition for binary uses 1 output neuron (for BCEWithLogitsLoss)
-                    # Or if a multiclass model was saved with a different number of classes than 37.
                     print(
-                        f"WARNING_DEBUG: Mismatch between num_classes from checkpoint's fc layer ({num_classes}) "
+                        f"WARNING: Mismatch between num_classes from checkpoint's fc layer ({num_classes}) "
                         f"and expected fc output features from ResNet50 class with binary_classification={self.is_binary_classification} ({expected_fc_output_features})."
                     )
-                    print(
-                        f"Proceeding with num_classes={num_classes} from checkpoint for state_dict loading."
-                    )
-                    # The loaded_model was already initialized based on self.is_binary_classification.
-                    # The load_state_dict call later should handle the actual layer sizes from the checkpoint.
+                    # print(
+                    #     f"Proceeding with num_classes={num_classes} from checkpoint for state_dict loading."
+                    # )
 
             else:
                 print(
-                    f"ERROR_DEBUG: Could not determine ResNet classifier layer key for {self.model_path}."
+                    f"ERROR: Could not determine ResNet classifier layer key for {self.model_path}."
                 )
                 raise KeyError(
                     f"Could not determine ResNet classifier layer key. Keys: {list(state_dict.keys())}"
                 )
 
         elif self.model_architecture == "vit":
-            print(f"DEBUG: Loading ViT model from checkpoint.")
+            # print(f"DEBUG: Loading ViT model from checkpoint.")
             possible_keys = [
                 "classifier.weight",
                 "vit.classifier.weight",
@@ -191,12 +204,11 @@ class ModelEvaluator:
             for key in possible_keys:
                 if key in state_dict:
                     last_layer_weights = state_dict[key]
-                    print(f"DEBUG: ViT classifier key: '{key}'")
+                    # print(f"DEBUG: ViT classifier key: '{key}'")
                     break
 
             if last_layer_weights is not None:
                 num_classes = last_layer_weights.size(0)
-                # Ensure model_name_or_path is available, fallback if necessary
                 vit_model_identifier = self.model_name_or_path
                 if not vit_model_identifier:
                     vit_model_identifier = "google/vit-base-patch16-224"  # Default
@@ -205,20 +217,20 @@ class ModelEvaluator:
                     )
                 loaded_model = ViT(
                     model_name_or_path=vit_model_identifier,
-                    num_classes=num_classes,
-                    pretrained_weights=False,
+                    num_classes=num_classes,  # ViT class expects num_classes to init classifier
+                    pretrained_weights=False,  # We are loading custom weights
                 )
-                print(f"DEBUG: ViT initialized. Num classes: {num_classes}")
+                # print(f"DEBUG: ViT initialized. Num classes: {num_classes}")
             else:
                 print(
-                    f"ERROR_DEBUG: Could not determine ViT classifier layer key for {self.model_path}."
+                    f"ERROR: Could not determine ViT classifier layer key for {self.model_path}."
                 )
                 raise KeyError(
                     f"Could not determine ViT classifier layer key. Keys: {list(state_dict.keys())}"
                 )
         else:
             print(
-                f"ERROR_DEBUG: Unknown model architecture: {self.model_architecture} for {self.model_path}"
+                f"ERROR: Unknown model architecture: {self.model_architecture} for {self.model_path}"
             )
             raise ValueError(f"Unknown model architecture: {self.model_architecture}")
 
@@ -226,124 +238,87 @@ class ModelEvaluator:
             loaded_model.load_state_dict(state_dict)
             loaded_model.to(self.device)
             loaded_model.eval()
-            print(
-                f"DEBUG: Model '{self.model_architecture}' loaded, weights set, and in eval mode."
-            )
+            # print(
+            #     f"DEBUG: Model '{self.model_architecture}' loaded, weights set, and in eval mode."
+            # )
             return loaded_model, num_classes
         else:
             print(
-                f"ERROR_DEBUG: Failed to load model or determine num_classes for {self.model_path}"
+                f"ERROR: Failed to load model or determine num_classes for {self.model_path}"
             )
-            # This should ideally be caught by earlier raises if keys aren't found
             raise SystemError(
                 f"Failed to correctly load model or determine num_classes for {self.model_path}"
             )
 
     def _get_test_dataloader(self):
-        print(
-            f"DEBUG: Getting test dataloader. Num classes for dataset: {self.num_classes}, Binary classification: {self.is_binary_classification}"
-        )
-        # Determine actual binary_classification flag for dataset loading
-        # If num_classes is 2, it's likely binary, but self.is_binary_classification from checkpoint is more reliable
+        # print(
+        #     f"DEBUG: Getting test dataloader. Num classes for dataset: {self.num_classes}, Binary classification: {self.is_binary_classification}"
+        # )
         dataset_binary_flag = self.is_binary_classification
 
-        # OxfordPetDataset's get_dataloaders expects binary_classification to guide label processing.
-        # If num_classes is > 2, it MUST be multiclass for the dataset.
         if self.num_classes > 2 and dataset_binary_flag:
             print(
                 f"Warning: num_classes is {self.num_classes} but checkpoint says binary. Forcing dataset to multiclass for dataloader."
             )
             dataset_binary_flag = False
-        elif self.num_classes == 2 and not dataset_binary_flag:
+        elif self.num_classes == 2 and not dataset_binary_flag:  # Typically ViT binary
             print(
-                f"Warning: num_classes is 2 but checkpoint says multiclass. Forcing dataset to binary for dataloader."
+                f"Warning: num_classes is 2 (often ViT binary) but checkpoint says multiclass. Forcing dataset to binary for dataloader based on is_binary_classification flag."
+            )
+            # Keep dataset_binary_flag as self.is_binary_classification from checkpoint is king
+        elif (
+            self.num_classes == 1 and not dataset_binary_flag
+        ):  # ResNet binary (1 logit) but checkpoint somehow multiclass
+            print(
+                f"Warning: num_classes is 1 (ResNet binary) but checkpoint indicates multiclass. Using binary for dataloader based on num_classes=1."
             )
             dataset_binary_flag = True
 
-        # Get dataloaders - the fourth item is num_classes_from_dataset (an int)
         _, _, test_loader, num_classes_from_dataset = OxfordPetDataset.get_dataloaders(
             data_dir=self.data_dir,
             batch_size=self.batch_size,
-            binary_classification=dataset_binary_flag,  # Use the determined flag
-            data_augmentation=False,  # No augmentation for testing
-            model_type=self.model_architecture,  # Pass architecture for potential ViT specific transforms
+            binary_classification=dataset_binary_flag,
+            data_augmentation=False,
+            model_type=self.model_architecture,
             vit_model_name=(
                 self.model_name_or_path
                 if self.model_architecture == "vit"
                 else "google/vit-base-patch16-224"
             ),
-            random_seed=42,  # Consistent seed for test split
+            random_seed=42,
         )
-        print(
-            f"DEBUG: Dataloader obtained. Num classes from dataset method: {num_classes_from_dataset}"
-        )
+        # print(
+        #     f"DEBUG: Dataloader obtained. Num classes from dataset method: {num_classes_from_dataset}"
+        # )
 
-        # Validate num_classes from model with num_classes_from_dataset
-        # Both self.num_classes (from model checkpoint) and num_classes_from_dataset (from dataset loader config) should align.
-        if self.num_classes != num_classes_from_dataset:
-            print(
-                f"ERROR_DEBUG: Mismatch! Num_classes from model checkpoint ({self.num_classes}) vs num_classes from dataset configuration ({num_classes_from_dataset})"
-            )
-            # This is a significant mismatch and likely indicates a problem in how the model was saved or how the dataset is being loaded for its type.
-            # For ResNet binary, model checkpoint num_classes might be 1 (logit) or 2 (softmaxed classes). Dataset should return 1 if binary_classification=True.
-            # For ResNet multiclass, model checkpoint num_classes should be 37. Dataset should return 37 if binary_classification=False.
-            if (
-                self.model_architecture == "resnet"
-                and self.is_binary_classification
-                and self.num_classes == 1
-                and num_classes_from_dataset == 1
-            ):
+        if self.is_binary_classification:
+            # For binary, model (ResNet) might output 1 logit (num_classes=1), ViT might output 2 (num_classes=2).
+            # Dataset loader with binary_classification=True gives num_classes_from_dataset=1 (labels are 0 or 1).
+            # This is generally fine. The important thing is that labels are 0/1.
+            if self.num_classes not in [1, 2]:
                 print(
-                    "INFO_DEBUG: ResNet binary (1 output neuron from model, 1 class type from dataset). This is consistent."
+                    f"WARNING: Binary classification model has unexpected num_classes: {self.num_classes}"
                 )
-            elif (
-                self.model_architecture == "resnet"
-                and not self.is_binary_classification
-                and self.num_classes == 37
-                and num_classes_from_dataset == 37
-            ):
-                print(
-                    "INFO_DEBUG: ResNet multiclass (37 output neurons from model, 37 class type from dataset). This is consistent."
-                )
-            elif (
-                self.model_architecture == "vit"
-                and self.is_binary_classification
-                and self.num_classes == 2
-                and num_classes_from_dataset == 1
-            ):  # ViT usually outputs 2 for binary_cross_entropy
-                print(
-                    "INFO_DEBUG: ViT binary (2 output neurons from model, 1 class type from dataset config). This implies dataset is binary."
-                )
-                # This can be acceptable if the ViT model uses 2 outputs for binary and dataset is configured as binary (num_classes_from_dataset=1)
-            elif (
-                self.model_architecture == "vit"
-                and not self.is_binary_classification
-                and self.num_classes == 37
-                and num_classes_from_dataset == 37
-            ):
-                print(
-                    "INFO_DEBUG: ViT multiclass (37 output neurons from model, 37 class type from dataset). This is consistent."
-                )
-            else:
+            if num_classes_from_dataset != 1:
                 raise ValueError(
-                    f"Critical mismatch between model's num_classes ({self.num_classes}) and dataset's configured num_classes ({num_classes_from_dataset})."
+                    f"Binary classification mode, but dataset loader returned {num_classes_from_dataset} classes instead of 1."
+                )
+        else:  # Multiclass
+            if self.num_classes != num_classes_from_dataset:
+                raise ValueError(
+                    f"Multiclass mismatch: Model num_classes ({self.num_classes}) vs Dataset num_classes ({num_classes_from_dataset})"
                 )
 
-        # Generate class names for reporting based on self.is_binary_classification (from checkpoint)
-        # and num_classes_from_dataset (which should align with self.num_classes after the check above)
         class_names_for_report = []
         if self.is_binary_classification:
-            # If model is binary (e.g. ResNet outputs 1 logit, or ViT outputs 2 logits for binary CE)
-            # And dataset was loaded as binary (num_classes_from_dataset should be 1)
-            print(
-                "INFO_DEBUG: Binary classification. Generating class names ['Cat', 'Dog'] for reporting."
-            )
+            # print(
+            #     "INFO_DEBUG: Binary classification. Generating class names ['Cat', 'Dog'] for reporting."
+            # )
             class_names_for_report = ["Cat", "Dog"]
-        else:  # Multiclass
-            # num_classes_from_dataset should be 37 for multiclass
-            print(
-                f"INFO_DEBUG: Multiclass classification ({num_classes_from_dataset} classes). Generating generic breed names for reporting."
-            )
+        else:
+            # print(
+            #     f"INFO_DEBUG: Multiclass classification ({num_classes_from_dataset} classes). Generating generic breed names for reporting."
+            # )
             class_names_for_report = [
                 f"Breed_{i}" for i in range(num_classes_from_dataset)
             ]
@@ -351,20 +326,19 @@ class ModelEvaluator:
         return test_loader, class_names_for_report
 
     def evaluate(self):
-        print(f"DEBUG: Entering evaluate() for {self.model_path}")
-        print(
-            f"DEBUG: self.checkpoint type at start of evaluate: {type(self.checkpoint)}"
-        )
+        # print(f"DEBUG: Entering evaluate() for {self.model_path}")
+        # print(
+        #     f"DEBUG: self.checkpoint type at start of evaluate: {type(self.checkpoint)}"
+        # )
         if self.checkpoint is None:
             print(
-                f"ERROR_DEBUG: self.checkpoint is None at the start of evaluate() for {self.model_path}. This should have been caught in _load_model."
+                f"ERROR: self.checkpoint is None at the start of evaluate() for {self.model_path}."
             )
-            # This indicates a logic error if _load_model was supposed to guarantee self.checkpoint is not None
-            return  # Or raise an error
-        else:
-            print(
-                f"DEBUG: self.checkpoint keys at start of evaluate (first level): {list(self.checkpoint.keys()) if isinstance(self.checkpoint, dict) else 'Not a dict'}"
-            )
+            return
+        # else:
+        # print(
+        #     f"DEBUG: self.checkpoint keys at start of evaluate (first level): {list(self.checkpoint.keys()) if isinstance(self.checkpoint, dict) else 'Not a dict'}"
+        # )
 
         metric_file_path = os.path.join(
             self.evaluation_subdir, "evaluation_metrics.json"
@@ -382,54 +356,171 @@ class ModelEvaluator:
                 )
                 # Fall through to re-evaluate
 
-        all_preds = []
-        all_labels = []
-        all_probs = []
+        all_preds_list = []
+        all_labels_list = []
+        # For binary: store P(class_1). For multiclass: store [P(class_0), ..., P(class_N)]
+        all_probs_for_metrics_list = []
 
         self.model.eval()
         with torch.no_grad():
             for inputs, labels in self.test_loader:
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                inputs, labels_batch = inputs.to(self.device), labels.to(self.device)
                 outputs = self.model(inputs)
 
-                logits = (
+                logits_for_eval = (
                     outputs.logits if hasattr(outputs, "logits") else outputs
-                )  # Handle HuggingFace output object
+                )
 
-                probs = torch.softmax(logits, dim=1)
-                _, preds = torch.max(logits, 1)
+                current_batch_preds = None
+                current_batch_probs_for_roc_pr = None
 
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(labels.cpu().numpy())
-                all_probs.extend(probs.cpu().numpy())
+                if self.is_binary_classification:
+                    if (
+                        self.model_architecture == "resnet"
+                    ):  # ResNet binary outputs [batch, 1] logit
+                        # Sigmoid gives P(class_1) for the single logit output
+                        probs_class_1 = torch.sigmoid(logits_for_eval).squeeze(
+                            -1
+                        )  # Shape: [batch]
+                        current_batch_preds = (probs_class_1 > 0.5).float()
+                        current_batch_probs_for_roc_pr = (
+                            probs_class_1.cpu().numpy()
+                        )  # Store P(class_1)
+                    else:  # Assumes ViT binary or other binary models output [batch, 2] logits
+                        probs_all_classes = torch.softmax(
+                            logits_for_eval, dim=1
+                        )  # Shape: [batch, 2]
+                        current_batch_preds = torch.argmax(probs_all_classes, dim=1)
+                        current_batch_probs_for_roc_pr = (
+                            probs_all_classes[:, 1].cpu().numpy()
+                        )  # Store P(class_1)
+                else:  # Multiclass
+                    probs_all_classes = torch.softmax(
+                        logits_for_eval, dim=1
+                    )  # Shape: [batch, num_classes]
+                    current_batch_preds = torch.argmax(probs_all_classes, dim=1)
+                    current_batch_probs_for_roc_pr = (
+                        probs_all_classes.cpu().numpy()
+                    )  # Store all class probabilities
 
-        all_preds = np.array(all_preds)
-        all_labels = np.array(all_labels)
-        all_probs = np.array(all_probs)
+                all_preds_list.extend(
+                    current_batch_preds.cpu().numpy()
+                )  # Store predictions
+                all_labels_list.extend(labels_batch.cpu().numpy())  # Store true labels
+                # For binary, this list will extend with 1D arrays (P(class_1) per batch item)
+                # For multiclass, this list will extend with 2D arrays (P(all classes) per batch item)
+                all_probs_for_metrics_list.extend(current_batch_probs_for_roc_pr)
+
+        all_preds = np.array(all_preds_list)
+        all_labels = np.array(all_labels_list)
+
+        # Convert all_probs_for_metrics_list to a single NumPy array
+        # If binary, it was a list of scalars (P(class_1)), so np.array makes it (n_samples,)
+        # If multiclass, it was a list of 1D arrays (one per sample, if extend was used on individual sample probs)
+        # or it was a list of batch_sized arrays. If it was extend(probs_all_classes.cpu().numpy()), then it is a list of arrays.
+        # Need to ensure all_probs_np is (n_samples,) for binary P(class_1) or (n_samples, n_classes) for multiclass.
+
+        if self.is_binary_classification:
+            # all_probs_for_metrics_list should be a flat list of P(class_1) values
+            all_probs_np = np.array(
+                all_probs_for_metrics_list
+            )  # Expected shape (n_samples,)
+        else:  # Multiclass
+            # all_probs_for_metrics_list contains arrays of shape (batch_size_i, num_classes) if extend was on batch arrays
+            # or it might be a flat list if extend was on individual sample arrays - check extend logic.
+            # current_batch_probs_for_roc_pr = probs_all_classes.cpu().numpy() # This is (batch_size, num_classes)
+            # all_probs_for_metrics_list.extend(current_batch_probs_for_roc_pr) <-- extends with rows of the array not the array itself
+            # Correction for extend: it should be a list of arrays, then vstack OR append rows
+            # Let's re-do the loop for all_probs_for_metrics_list for clarity
+            pass  # Revisit all_probs_np formation after correcting the loop
+
+        # --- Corrected loop and all_probs_np formation --- START
+        all_preds_list_corrected = []
+        all_labels_list_corrected = []
+        all_probs_for_metrics_list_corrected = (
+            []
+        )  # This will be a list of appropriate items
+
+        self.model.eval()
+        with torch.no_grad():
+            for inputs, labels_batch in self.test_loader:
+                inputs, labels_batch = inputs.to(self.device), labels_batch.to(
+                    self.device
+                )
+                outputs = self.model(inputs)
+                logits_for_eval = (
+                    outputs.logits if hasattr(outputs, "logits") else outputs
+                )
+
+                current_batch_preds_corrected = None
+
+                if self.is_binary_classification:
+                    if self.model_architecture == "resnet":
+                        probs_class_1 = torch.sigmoid(logits_for_eval).squeeze(-1)
+                        current_batch_preds_corrected = (probs_class_1 > 0.5).float()
+                        all_probs_for_metrics_list_corrected.extend(
+                            probs_class_1.cpu().numpy()
+                        )  # Extends with individual P(class_1) floats
+                    else:  # ViT binary
+                        probs_all_classes = torch.softmax(logits_for_eval, dim=1)
+                        current_batch_preds_corrected = torch.argmax(
+                            probs_all_classes, dim=1
+                        )
+                        all_probs_for_metrics_list_corrected.extend(
+                            probs_all_classes[:, 1].cpu().numpy()
+                        )  # Extends with individual P(class_1) floats
+                else:  # Multiclass
+                    probs_all_classes = torch.softmax(logits_for_eval, dim=1)
+                    current_batch_preds_corrected = torch.argmax(
+                        probs_all_classes, dim=1
+                    )
+                    # For multiclass, store the entire probability array for each sample
+                    for i in range(probs_all_classes.shape[0]):
+                        all_probs_for_metrics_list_corrected.append(
+                            probs_all_classes[i].cpu().numpy()
+                        )  # Append each sample's prob array
+
+                all_preds_list_corrected.extend(
+                    current_batch_preds_corrected.cpu().numpy()
+                )
+                all_labels_list_corrected.extend(labels_batch.cpu().numpy())
+
+        all_preds = np.array(all_preds_list_corrected)
+        all_labels = np.array(all_labels_list_corrected)
+
+        if self.is_binary_classification:
+            all_probs_np = np.array(
+                all_probs_for_metrics_list_corrected
+            )  # Shape (n_samples,)
+        else:  # Multiclass
+            if all_probs_for_metrics_list_corrected:  # Check if not empty
+                all_probs_np = np.vstack(
+                    all_probs_for_metrics_list_corrected
+                )  # Shape (n_samples, n_classes)
+            else:
+                all_probs_np = np.array([])  # Empty array if no samples
+        # --- Corrected loop and all_probs_np formation --- END
 
         unique_true_and_pred_labels = sorted(
             list(np.unique(np.concatenate((all_labels, all_preds))))
         )
-        print(
-            f"DEBUG: Unique labels found in true and preds: {unique_true_and_pred_labels}"
-        )
+        # print(
+        #     f"DEBUG: Unique labels found in true and preds: {unique_true_and_pred_labels}"
+        # )
 
         target_names_for_report = []
         if self.is_binary_classification:
-            # For binary, self.class_names is already ['Cat', 'Dog']
-            # We need to select the correct names based on actual labels present
             temp_binary_names = {}
-            if 0 in unique_true_and_pred_labels:  # Cat
-                temp_binary_names[0] = self.class_names[0]  # Should be 'Cat'
-            if 1 in unique_true_and_pred_labels:  # Dog
-                temp_binary_names[1] = self.class_names[1]  # Should be 'Dog'
+            if 0 in unique_true_and_pred_labels:
+                temp_binary_names[0] = self.class_names[0]
+            if 1 in unique_true_and_pred_labels:
+                temp_binary_names[1] = self.class_names[1]
             target_names_for_report = [
                 temp_binary_names[label]
                 for label in unique_true_and_pred_labels
                 if label in temp_binary_names
             ]
             if not target_names_for_report and unique_true_and_pred_labels:
-                # Fallback if only one class predicted and it wasn't 0 or 1, or self.class_names was wrong
                 print(
                     f"WARNING: Binary classification with unusual labels {unique_true_and_pred_labels}. Using generic target names."
                 )
@@ -437,35 +528,29 @@ class ModelEvaluator:
                     f"ActualClass_{i}" for i in unique_true_and_pred_labels
                 ]
         else:  # Multiclass
-            # self.class_names should be ['Breed_0', ..., 'Breed_36']
-            # We only want names for labels that are actually present.
             target_names_for_report = []
             for label_val in unique_true_and_pred_labels:
                 if 0 <= label_val < len(self.class_names):
                     target_names_for_report.append(self.class_names[label_val])
                 else:
-                    target_names_for_report.append(
-                        f"ActualClass_{label_val}"
-                    )  # Fallback for unexpected label values
+                    target_names_for_report.append(f"ActualClass_{label_val}")
 
-        # Ensure target_names_for_report has same length as unique_true_and_pred_labels
         if len(target_names_for_report) != len(unique_true_and_pred_labels):
             print(
-                f"CRITICAL_DEBUG: Length mismatch after generating target_names_for_report. unique_labels: {unique_true_and_pred_labels}, generated_names: {target_names_for_report}"
+                f"CRITICAL WARNING: Length mismatch after generating target_names_for_report. unique_labels: {unique_true_and_pred_labels}, generated_names: {target_names_for_report}"
             )
-            # Fallback to generic names based on unique_true_and_pred_labels to prevent crash
             target_names_for_report = [
                 f"FallbackClass_{i}" for i in unique_true_and_pred_labels
             ]
 
-        print(
-            f"Debug: Classification report will use target_names: {target_names_for_report} and labels: {unique_true_and_pred_labels}"
-        )
+        # print(
+        #     f"Debug: Classification report will use target_names: {target_names_for_report} and labels: {unique_true_and_pred_labels}"
+        # )
         report_dict = classification_report(
             all_labels,
             all_preds,
-            target_names=target_names_for_report,  # Must match the order and number of unique_true_and_pred_labels
-            labels=unique_true_and_pred_labels,  # Explicitly pass the labels that are present and to be reported
+            target_names=target_names_for_report,
+            labels=unique_true_and_pred_labels,
             output_dict=True,
             zero_division=0,
         )
@@ -484,31 +569,46 @@ class ModelEvaluator:
             "roc_auc_ovr_weighted": None,
         }
 
-        if self.num_classes == 2 and all_probs.shape[1] == 2:  # Binary classification
-            try:
-                metrics["roc_auc"] = roc_auc_score(all_labels, all_probs[:, 1])
-                fpr, tpr, _ = roc_curve(all_labels, all_probs[:, 1])
-                self.plot_roc_curve(fpr, tpr, metrics["roc_auc"], "roc_curve.png")
+        if self.is_binary_classification:
+            if all_probs_np.ndim == 1 and len(all_probs_np) == len(all_labels):
+                try:
+                    metrics["roc_auc"] = roc_auc_score(all_labels, all_probs_np)
+                    fpr, tpr, _ = roc_curve(all_labels, all_probs_np)
+                    self.plot_roc_curve(fpr, tpr, metrics["roc_auc"], "roc_curve.png")
 
-                precision, recall, _ = precision_recall_curve(
-                    all_labels, all_probs[:, 1]
-                )
-                metrics["pr_auc"] = auc(recall, precision)
-                self.plot_pr_curve(precision, recall, metrics["pr_auc"], "pr_curve.png")
-            except Exception as e:
+                    precision, recall, _ = precision_recall_curve(
+                        all_labels, all_probs_np
+                    )
+                    metrics["pr_auc"] = auc(recall, precision)
+                    self.plot_pr_curve(
+                        precision, recall, metrics["pr_auc"], "pr_curve.png"
+                    )
+                except Exception as e:
+                    print(
+                        f"Error calculating/plotting binary ROC/PR for {self.model_filename}: {e}"
+                    )
+            else:
                 print(
-                    f"Error calculating/plotting binary ROC/PR for {self.model_filename}: {e}"
+                    f"Skipping binary ROC/PR for {self.model_filename} due to probability array shape mismatch. Probs shape: {all_probs_np.shape if isinstance(all_probs_np, np.ndarray) else 'not an ndarray'}"
                 )
-        elif self.num_classes > 2:  # Multiclass classification
-            try:
-                metrics["roc_auc_ovr_weighted"] = roc_auc_score(
-                    all_labels, all_probs, multi_class="ovr", average="weighted"
+        elif self.num_classes > 1:  # Multiclass (check all_probs_np shape)
+            if (
+                all_probs_np.ndim == 2
+                and all_probs_np.shape[0] == len(all_labels)
+                and all_probs_np.shape[1] == self.num_classes
+            ):
+                try:
+                    metrics["roc_auc_ovr_weighted"] = roc_auc_score(
+                        all_labels, all_probs_np, multi_class="ovr", average="weighted"
+                    )
+                except ValueError as e:
+                    print(
+                        f"Could not calculate OvR ROC AUC for {self.model_filename}: {e}"
+                    )
+            else:
+                print(
+                    f"Skipping multiclass ROC_AUC for {self.model_filename} due to probability array shape mismatch. Probs shape: {all_probs_np.shape if isinstance(all_probs_np, np.ndarray) else 'not an ndarray'}"
                 )
-                # Per-class ROC/PR curves could be plotted here if desired
-            except (
-                ValueError
-            ) as e:  # May happen if a class has no test samples or all predictions are one class
-                print(f"Could not calculate OvR ROC AUC for {self.model_filename}: {e}")
 
         with open(metric_file_path, "w") as f:
             json.dump(
@@ -637,145 +737,262 @@ class NpEncoder(json.JSONEncoder):
         return super(NpEncoder, self).default(obj)
 
 
-def update_comparison_file(results_dir, all_model_metrics_list):
-    comparison_filepath = os.path.join(results_dir, "model_comparison.csv")
+def append_to_evaluation_csv(metrics_data, csv_filepath):
+    """Appends a dictionary of metrics to a CSV file."""
+    fieldnames = [
+        "model_filename",
+        "evaluation_run_path",
+        "model_architecture",
+        "classification_type",
+        "num_classes_model",
+        "epochs",
+        "epochs_labeled",
+        "epochs_combined",
+        "learning_rate",
+        "learning_rate_config",
+        "batch_size",
+        "loss_function_type",
+        "imbalance_strategy",
+        "label_fraction",
+        "training_option_resnet_e2",
+        "num_layers_trained_excluding_fc",
+        "data_augmentation",
+        "finetune_bn",
+        "l2_lambda",
+        "monitor_gradients",
+        "gradient_monitor_interval",
+        "vit_model_checkpoint",
+        "training_type",  # General training type (supervised, semi-supervised, etc.)
+        "training_time_seconds",
+        "accuracy",
+        "weighted_precision",
+        "weighted_recall",
+        "weighted_f1_score",
+        "roc_auc",
+        "pr_auc",
+        "roc_auc_ovr_weighted",
+    ]
 
-    processed_metrics_for_df = []
-    for metrics_data in all_model_metrics_list:
-        if not metrics_data:
-            continue  # Skip if None (e.g. error during eval)
+    row_to_write = {}
+    # Populate row_to_write from metrics_data, using .get() for safety
+    for key in fieldnames:
+        row_to_write[key] = metrics_data.get(key)
 
+        # Specific handling for metrics from classification_report
         report = metrics_data.get("classification_report", {})
-        weighted_avg = (
-            report.get("weighted avg", {}) if isinstance(report, dict) else {}
-        )
+    weighted_avg = report.get("weighted avg", {}) if isinstance(report, dict) else {}
+    row_to_write["weighted_precision"] = weighted_avg.get("precision")
+    row_to_write["weighted_recall"] = weighted_avg.get("recall")
+    row_to_write["weighted_f1_score"] = weighted_avg.get("f1-score")
 
-        # Determine primary ROC AUC value to display
-        roc_auc_display = metrics_data.get("roc_auc")  # Binary
-        if roc_auc_display is None:
-            roc_auc_display = metrics_data.get("roc_auc_ovr_weighted")  # Multiclass
+    # Handle learning rate specifically if it's stored as a list in config
+    lr_config = metrics_data.get(
+        "learning_rate_config", metrics_data.get("learning_rate")
+    )
+    if isinstance(lr_config, list):
+        row_to_write["learning_rate_config"] = str(lr_config)
+        if not metrics_data.get("learning_rate"):  # If single LR wasn't also stored
+            row_to_write["learning_rate"] = lr_config[0] if lr_config else None
+    elif lr_config is not None:  # It's a single LR value
+        row_to_write["learning_rate"] = lr_config
+        row_to_write["learning_rate_config"] = None
 
-        row = {
-            "Model Filename": metrics_data.get("model_filename"),
-            "Architecture": metrics_data.get("model_architecture"),
-            "Type": metrics_data.get("classification_type"),
-            "Num Classes": metrics_data.get("num_classes_model"),
-            "Overall Accuracy": f'{metrics_data.get("accuracy", 0):.4f}',
-            "Weighted Precision": f'{weighted_avg.get("precision", 0):.4f}',
-            "Weighted Recall": f'{weighted_avg.get("recall", 0):.4f}',
-            "Weighted F1-Score": f'{weighted_avg.get("f1-score", 0):.4f}',
-            "ROC AUC": (
-                f"{roc_auc_display:.4f}" if roc_auc_display is not None else "N/A"
-            ),
-            "PR AUC (Binary)": (
-                f'{metrics_data.get("pr_auc"):.4f}'
-                if metrics_data.get("pr_auc") is not None
-                else "N/A"
-            ),
-            "Details Path": os.path.splitext(metrics_data.get("model_filename"))[
-                0
-            ],  # Path relative to evaluation_dir
-        }
-        processed_metrics_for_df.append(row)
-
-    if not processed_metrics_for_df:
-        print("No valid metrics to update comparison file.")
-        return
-
-    new_df = pd.DataFrame(processed_metrics_for_df)
-
-    combined_df = new_df
-    if os.path.exists(comparison_filepath):
-        try:
-            existing_df = pd.read_csv(comparison_filepath)
-            if not existing_df.empty:
-                # Merge: Update existing rows, append new ones
-                # Use 'Model Filename' as index for easy update/append
-                new_df.set_index("Model Filename", inplace=True)
-                existing_df.set_index("Model Filename", inplace=True)
-                combined_df = new_df.combine_first(
-                    existing_df
-                ).reset_index()  # new_df values take precedence
-            # If existing_df is empty, combined_df remains new_df
-        except pd.errors.EmptyDataError:  # File exists but is empty
-            pass  # combined_df is already new_df
-        except Exception as e:
-            print(
-                f"Error reading existing comparison file {comparison_filepath}: {e}. Overwriting."
-            )
-            # Fall through to save new_df as combined_df
-
-    if not combined_df.empty:
-        combined_df.sort_values(by="Model Filename", inplace=True)
-        combined_df.to_csv(comparison_filepath, index=False)
-        print(f"Model comparison summary updated/created at {comparison_filepath}")
-    else:
-        print("No data to write to comparison file.")
-
-
-def main():
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {DEVICE}")
-
-    # Project root is one level up from src where this script is
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-    DATA_DIR = os.path.join(project_root, "data", "raw")
-    MODELS_ROOT_DIR = os.path.join(project_root, "models")
-    EVALUATION_ROOT_DIR = os.path.join(project_root, "evaluation")
-
-    print(f"Data directory: {DATA_DIR}")
-    print(f"Models root directory: {MODELS_ROOT_DIR}")
-    print(f"Evaluation root directory: {EVALUATION_ROOT_DIR}")
-
-    os.makedirs(EVALUATION_ROOT_DIR, exist_ok=True)
-
-    if not os.path.exists(DATA_DIR):
-        print(f"ERROR: Data directory not found at {DATA_DIR}. Please check the path.")
-        return
-    if not os.path.exists(MODELS_ROOT_DIR):
+    file_exists = os.path.isfile(csv_filepath)
+    try:
+        with open(csv_filepath, mode="a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            if (
+                not file_exists or os.path.getsize(csv_filepath) == 0
+            ):  # Check if file is empty
+                writer.writeheader()
+            writer.writerow(row_to_write)
         print(
-            f"ERROR: Models directory not found at {MODELS_ROOT_DIR}. No models to evaluate."
+            f"Evaluation results for {metrics_data.get('model_filename')} appended to {csv_filepath}"
         )
+    except IOError as e:
+        print(f"Error writing to CSV {csv_filepath}: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred while writing to CSV: {e}")
+
+
+def perform_and_save_evaluation(
+    model_path,
+    model_eval_output_base_path,
+    experiment_params_dict,
+    training_time=None,
+    device_str="cpu",
+):
+    """
+    Performs evaluation for a given model, saves results in a unique directory,
+    and appends key metrics to a global CSV file.
+
+    Args:
+        model_path (str): Path to the saved .pth model file.
+        model_eval_output_base_path (str): The base path for the evaluation output directory.
+                                           Example: ../evaluation/resnet/binary/resnet_binary_10ep_lr0.001_sup
+                                           A suffix like '_1', '_2' will be added if it already exists.
+        experiment_params_dict (dict): Dictionary containing parameters of the experiment.
+        training_time (float, optional): Training time in seconds. Defaults to None.
+        device_str (str, optional): Device to use ('cuda' or 'cpu'). Defaults to "cpu".
+    """
+    print(f"\n--- Starting evaluation for model: {model_path} ---")
+    print(
+        f"Experiment params: {json.dumps(experiment_params_dict, indent=2, cls=NpEncoder)}"
+    )
+    if training_time is not None:
+        print(f"Training time: {training_time:.2f}s")
+
+    # 1. Determine unique evaluation directory
+    eval_run_dir = model_eval_output_base_path
+    counter = 1
+    # Check if the base path itself (without _N) exists and is a directory.
+    # If it exists and is NOT a directory, or if we need a new numbered one.
+    while os.path.exists(eval_run_dir):
+        if os.path.isdir(eval_run_dir) and not os.listdir(
+            eval_run_dir
+        ):  # If it's an empty dir, use it
+            print(f"Found existing empty directory, will use: {eval_run_dir}")
+            break
+        eval_run_dir = f"{model_eval_output_base_path}_{counter}"
+        counter += 1
+
+    try:
+        os.makedirs(eval_run_dir, exist_ok=True)
+        print(f"Evaluation run directory set to: {eval_run_dir}")
+    except OSError as e:
+        print(f"Error creating directory {eval_run_dir}: {e}")
         return
 
-    all_model_metrics_collected = []
+    # 2. Instantiate ModelEvaluator
+    # Determine project root and data_dir relative to this script's location (src/)
+    # Assuming this script (evaluation.py) is in 'src' folder
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(current_script_dir, ".."))
+    data_dir = os.path.join(project_root, "data", "raw")
 
-    for arch_folder in os.listdir(MODELS_ROOT_DIR):  # e.g., 'resnet', 'vit'
-        arch_path = os.path.join(MODELS_ROOT_DIR, arch_folder)
-        if os.path.isdir(arch_path):
-            for type_folder in os.listdir(arch_path):  # e.g., 'binary', 'multiclass'
-                type_path = os.path.join(arch_path, type_folder)
-                if os.path.isdir(type_path):
-                    for model_file in os.listdir(type_path):
-                        if model_file.endswith(".pth"):
-                            model_full_path = os.path.join(type_path, model_file)
-                            print(f"\n--- Processing model: {model_full_path} ---")
-                            try:
-                                evaluator = ModelEvaluator(
-                                    model_path=model_full_path,
-                                    device=DEVICE,
-                                    data_dir=DATA_DIR,
-                                    results_dir=EVALUATION_ROOT_DIR,  # Pass the root eval dir
-                                )
-                                # evaluate() method now handles checking if metrics exist and loading them
-                                metrics = evaluator.evaluate()
-                                if metrics:
-                                    all_model_metrics_collected.append(metrics)
-                            except Exception as e:
-                                print(
-                                    f"ERROR during evaluation setup or execution for {model_file}: {e}"
-                                )
-                                import traceback
+    # Default batch size, can be overridden by experiment_params_dict
+    batch_size = experiment_params_dict.get("batch_size", 32)
 
-                                traceback.print_exc()
+    try:
+        evaluator = ModelEvaluator(
+            model_path=model_path,
+            device=torch.device(device_str),
+            data_dir=data_dir,
+            batch_size=batch_size,
+            evaluation_run_specific_dir=eval_run_dir,
+        )
 
-    if all_model_metrics_collected:
-        print(f"\n--- Updating overall comparison file ---")
-        update_comparison_file(EVALUATION_ROOT_DIR, all_model_metrics_collected)
+        # 3. Run evaluation
+        metrics = evaluator.evaluate()  # This saves plots and json to eval_run_dir
+    except Exception as e:
+        print(
+            f"ERROR during ModelEvaluator instantiation or evaluation for {model_path}: {e}"
+        )
+        import traceback
+
+        traceback.print_exc()
+        return  # Stop if evaluation fails
+
+    if metrics:
+        # 4. Augment metrics with experiment params and training time for CSV
+        metrics_for_csv = metrics.copy()
+        metrics_for_csv.update(
+            experiment_params_dict
+        )  # Add/overwrite with experiment parameters
+
+        if training_time is not None:
+            metrics_for_csv["training_time_seconds"] = training_time
+
+        # Add relative path to the evaluation run directory for the CSV
+        try:
+            # project_root for all_evaluations.csv is one level above src
+            csv_project_root = os.path.abspath(
+                os.path.join(project_root)
+            )  # project_root IS the project root
+            metrics_for_csv["evaluation_run_path"] = os.path.relpath(
+                eval_run_dir, csv_project_root
+            )
+        except ValueError:  # If paths are on different drives on Windows
+            metrics_for_csv["evaluation_run_path"] = (
+                eval_run_dir  # Fallback to absolute path
+            )
+
+        # 5. Append to CSV
+        # CSV path is PROJECT_ROOT/evaluation/all_evaluations.csv
+        csv_filepath = os.path.join(project_root, "evaluation", "all_evaluations.csv")
+        append_to_evaluation_csv(metrics_for_csv, csv_filepath)
+        print(f"--- Evaluation completed for model: {model_path} ---")
     else:
-        print("\nNo models found or processed. Comparison file not updated.")
+        print(
+            f"WARNING: Evaluation did not return metrics for {model_path}. CSV not updated."
+        )
 
 
 if __name__ == "__main__":
-    main()
+    print("--- Running Test Evaluation ---")
+
+    # --- Configuration for the test ---
+    # Absolute path to the model you want to test
+    # IMPORTANT: Replace this with the correct ABSOLUTE path to your model if it's different
+    # or ensure your script's execution context allows this relative path from project root.
+    # Assuming evaluation.py is in src, and models is ../models from src.
+
+    # Let's try to make the model path more robust for testing from src/
+    current_script_dir_for_test = os.path.dirname(os.path.abspath(__file__))
+    project_root_for_test = os.path.abspath(
+        os.path.join(current_script_dir_for_test, "..")
+    )
+
+    test_model_relative_path = "models/resnet/binary/resnet_binary_1ep_lr0.001_sup.pth"
+    test_model_full_path = os.path.join(project_root_for_test, test_model_relative_path)
+
+    if not os.path.exists(test_model_full_path):
+        print(f"ERROR: Test model not found at {test_model_full_path}")
+        print("Please ensure the path is correct and the model file exists.")
+    else:
+        print(f"Attempting to evaluate model: {test_model_full_path}")
+
+        # Base name for the evaluation output directory (without _1, _2 suffixes yet)
+        # This should match the logic in main.py: ../evaluation/<arch>/<class_type>/<model_filename_base>
+        model_filename_base_for_test = "resnet_binary_1ep_lr0.001_sup"
+        test_eval_output_base_relative_path = (
+            f"evaluation/resnet/binary/{model_filename_base_for_test}"
+        )
+        test_eval_output_base_full_path = os.path.join(
+            project_root_for_test, test_eval_output_base_relative_path
+        )
+
+        # Experiment parameters mimicking how they would be in main.py for this run
+        test_experiment_params = {
+            "model_architecture": "resnet",
+            "classification_type": "binary",
+            "epochs": 1,
+            "learning_rate": 0.001,  # or "learning_rate_config": [0.001]
+            "training_type": "supervised",
+            "monitor_gradients": False,
+            # "gradient_monitor_interval": 100, # Not relevant if monitor_gradients is False
+            "batch_size": 32,  # Assuming default
+            "model_path": test_model_full_path,  # Path to the model being evaluated
+            # Add any other parameters that would be in experiment_params for this specific run
+            # and are expected by the CSV header or logic in ModelEvaluator/append_to_evaluation_csv
+            "label_fraction": None,
+            "imbalance_strategy": None,
+            "data_augmentation": False,  # Common default
+            "finetune_bn": True,  # Common default for ResNet supervised
+            "l2_lambda": 0.0,  # Common default
+        }
+
+        test_training_time = 60.5  # Example training time in seconds
+
+        # Determine device
+        test_device_str = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"Using device for test: {test_device_str}")
+
+        perform_and_save_evaluation(
+            model_path=test_model_full_path,
+            model_eval_output_base_path=test_eval_output_base_full_path,
+            experiment_params_dict=test_experiment_params,
+            training_time=test_training_time,
+            device_str=test_device_str,
+        )
+        print("--- Test Evaluation Finished ---")
