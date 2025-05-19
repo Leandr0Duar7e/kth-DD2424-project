@@ -14,6 +14,7 @@ from trainer import ModelTrainer
 from dataset import OxfordPetDataset
 from utils import get_device, get_swedish_waiting_message, create_directories
 from utils import compute_class_weights, get_oversampled_loader
+from evaluation import perform_and_save_evaluation
 
 import matplotlib
 
@@ -22,6 +23,9 @@ matplotlib.use("Agg")  # Use a non-interactive backend (no GUI required)
 # Create required directories
 create_directories("../models/resnet", ["binary", "multiclass", "pretrained"])
 create_directories("../models/vit", ["binary", "multiclass"])
+# Also ensure the top-level evaluation directory exists, where all_evaluations.csv will go
+if not os.path.exists("../evaluation"):
+    os.makedirs("../evaluation")
 
 
 def display_welcome_message():
@@ -205,7 +209,6 @@ def run_experiment_1():
             trainer.save_model(full_save_path=model_save_path)
             experiment_params["model_path"] = model_save_path
 
-            # Placeholder for evaluation call
             evaluation_output_dir = os.path.join(
                 "..",
                 "evaluation",
@@ -214,9 +217,15 @@ def run_experiment_1():
                 model_filename_base,
             )
             print(
-                f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}, time: {training_time:.2f}s"
+                f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
             )
-            # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, training_time=training_time, experiment_params_dict=experiment_params)
+            perform_and_save_evaluation(
+                model_path=model_save_path,
+                model_eval_output_base_path=evaluation_output_dir,
+                experiment_params_dict=experiment_params,
+                training_time=training_time,
+                device_str=device.type,
+            )
 
         # Evaluate on test set
         print("\nEvaluating model on test set...")
@@ -367,9 +376,15 @@ def run_experiment_1_semi_supervised():
             model_filename_base,
         )
         print(
-            f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}, total time: {total_training_time:.2f}s"
+            f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
         )
-        # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, training_time=total_training_time, experiment_params_dict=experiment_params)
+        perform_and_save_evaluation(
+            model_path=model_save_path,
+            model_eval_output_base_path=evaluation_output_dir,
+            experiment_params_dict=experiment_params,
+            training_time=total_training_time,
+            device_str=device.type,
+        )
 
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -542,9 +557,15 @@ def run_experiment_imbalanced_multiclass():
             model_filename_base,  # Subfolder named after the model base name
         )
         print(
-            f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}, time: {training_time:.2f}s"
+            f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
         )
-        # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, training_time=training_time, experiment_params_dict=experiment_params)
+        perform_and_save_evaluation(
+            model_path=model_save_path,
+            model_eval_output_base_path=evaluation_output_dir,
+            experiment_params_dict=experiment_params,
+            training_time=training_time,
+            device_str=device.type,
+        )
 
     # Evaluate on test set
     print("\nEvaluating model on test set...")
@@ -786,9 +807,14 @@ def run_experiment_2_semi_supervised():
             model_filename_base,
         )
         print(
-            f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+            f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
         )
-        # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, experiment_params_dict=experiment_params)
+        perform_and_save_evaluation(
+            model_path=model_save_path,
+            model_eval_output_base_path=evaluation_output_dir,
+            experiment_params_dict=experiment_params,
+            device_str=device.type,
+        )
 
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -1028,9 +1054,15 @@ def run_experiment_2():
                 model_filename_base,
             )
             print(
-                f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+                f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
             )
-            # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir,training_time=training_time, experiment_params_dict=experiment_params)
+            perform_and_save_evaluation(
+                model_path=model_save_path,
+                model_eval_output_base_path=evaluation_output_dir,
+                experiment_params_dict=experiment_params,
+                training_time=training_time,
+                device_str=device.type,
+            )
 
         print("\nEvaluating model on test set...")
         test_loss, test_acc = trainer.evaluate(test_loader)
@@ -1205,9 +1237,14 @@ def run_experiment_vit_binary():
                 model_filename_base,
             )
             print(
-                f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+                f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
             )
-            # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, experiment_params_dict=experiment_params)
+            perform_and_save_evaluation(
+                model_path=model_save_path,
+                model_eval_output_base_path=evaluation_output_dir,
+                experiment_params_dict=experiment_params,
+                device_str=device.type,
+            )
 
         print("\nEvaluating ViT model on test set...")
         test_loss, test_acc = trainer.evaluate(test_loader)
@@ -1402,9 +1439,14 @@ def run_experiment_vit_binary_semi():
             model_filename_base,
         )
         print(
-            f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+            f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
         )
-        # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, experiment_params_dict=experiment_params)
+        perform_and_save_evaluation(
+            model_path=model_save_path,
+            model_eval_output_base_path=evaluation_output_dir,
+            experiment_params_dict=experiment_params,
+            device_str=device.type,
+        )
 
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -1594,9 +1636,14 @@ def run_experiment_vit_multiclass_semi():
             model_filename_base,
         )
         print(
-            f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+            f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
         )
-        # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, experiment_params_dict=experiment_params)
+        perform_and_save_evaluation(
+            model_path=model_save_path,
+            model_eval_output_base_path=evaluation_output_dir,
+            experiment_params_dict=experiment_params,
+            device_str=device.type,
+        )
 
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -1797,9 +1844,14 @@ def run_experiment_vit_multiclass_imbalanced():
             model_filename_base,
         )
         print(
-            f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+            f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
         )
-        # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, experiment_params_dict=experiment_params)
+        perform_and_save_evaluation(
+            model_path=model_save_path,
+            model_eval_output_base_path=evaluation_output_dir,
+            experiment_params_dict=experiment_params,
+            device_str=device.type,
+        )
 
     print("\nEvaluating ViT model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -1976,9 +2028,15 @@ def run_experiment_vit_multiclass():
                 model_filename_base,
             )
             print(
-                f"Placeholder: Call evaluation for {model_save_path}, output to {evaluation_output_dir}"
+                f"Calling evaluation for {model_save_path}, base output dir: {evaluation_output_dir}"
             )
-            # evaluation.perform_and_save_evaluation(model_path=model_save_path, evaluation_output_dir=evaluation_output_dir, experiment_params_dict=experiment_params)
+            perform_and_save_evaluation(
+                model_path=model_save_path,
+                model_eval_output_base_path=evaluation_output_dir,
+                experiment_params_dict=experiment_params,
+                training_time=training_time,
+                device_str=device.type,
+            )
 
         print("\nEvaluating ViT model on test set...")
         test_loss, test_acc = trainer.evaluate(test_loader)
