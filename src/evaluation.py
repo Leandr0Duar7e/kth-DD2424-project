@@ -65,6 +65,7 @@ class ModelEvaluator:
         )  # Default based on original project
         self.model_name_or_path = self.checkpoint.get("model_name_or_path")  # For ViT
 
+        # Existing debug prints (will be updated or preceded by new logic)
         # print(f"DEBUG: Model architecture from checkpoint: {self.model_architecture}")
         # print(
         #     f"DEBUG: Is binary classification from checkpoint: {self.is_binary_classification}"
@@ -72,6 +73,80 @@ class ModelEvaluator:
         # print(
         #     f"DEBUG: ViT model_name_or_path from checkpoint: {self.model_name_or_path}"
         # )
+
+        # Correction logic for model_architecture
+        original_checkpoint_arch = self.model_architecture
+        corrected_arch = False
+
+        if (
+            self.model_architecture == "resnet"
+            and ("vit" in self.model_path.lower() or "/vit/" in self.model_path)
+            and self.model_name_or_path
+        ):
+            print(
+                f"WARNING: Checkpoint indicates model_architecture is 'resnet', but model_path ('{self.model_path}') and presence of 'model_name_or_path' ('{self.model_name_or_path}') suggest 'vit'. Overriding to 'vit'."
+            )
+            self.model_architecture = "vit"
+            corrected_arch = True
+        elif (
+            self.model_architecture == "vit"
+            and ("resnet" in self.model_path.lower() or "/resnet/" in self.model_path)
+            and not self.model_name_or_path
+        ):  # ResNet models wouldn't typically have model_name_or_path set from HuggingFace
+            print(
+                f"WARNING: Checkpoint indicates model_architecture is 'vit', but model_path ('{self.model_path}') suggests 'resnet' and 'model_name_or_path' is missing. Overriding to 'resnet'."
+            )
+            self.model_architecture = "resnet"
+            corrected_arch = True
+        elif self.model_architecture == "unknown":
+            inferred_from_path_or_specific_key = False
+            if self.model_name_or_path and (
+                "vit" in self.model_path.lower()
+                or "/vit/" in self.model_path
+                or not (
+                    "resnet" in self.model_path.lower() or "/resnet/" in self.model_path
+                )
+            ):
+                # If model_name_or_path exists, and path is vit-like or neutral, lean towards vit.
+                self.model_architecture = "vit"
+                inferred_from_path_or_specific_key = True
+                print(
+                    f"INFO: model_architecture was 'unknown'. Inferred as 'vit' based on model_name_or_path ('{self.model_name_or_path}') and/or model_path."
+                )
+            elif "vit" in self.model_path.lower() or "/vit/" in self.model_path:
+                self.model_architecture = "vit"
+                inferred_from_path_or_specific_key = True
+                print(
+                    f"INFO: model_architecture was 'unknown'. Inferred as 'vit' based on model_path ('{self.model_path}')."
+                )
+            elif "resnet" in self.model_path.lower() or "/resnet/" in self.model_path:
+                self.model_architecture = "resnet"
+                inferred_from_path_or_specific_key = True
+                print(
+                    f"INFO: model_architecture was 'unknown'. Inferred as 'resnet' based on model_path ('{self.model_path}')."
+                )
+
+            if inferred_from_path_or_specific_key:
+                corrected_arch = True  # Technically an inference, but changes 'unknown'
+
+        print(
+            f"DEBUG: Original model_architecture from checkpoint: {original_checkpoint_arch}"
+        )
+        if corrected_arch:
+            print(
+                f"DEBUG: Effective model_architecture after correction/inference: {self.model_architecture}"
+            )
+        else:
+            print(
+                f"DEBUG: Model architecture from checkpoint (no correction applied): {self.model_architecture}"
+            )
+
+        print(
+            f"DEBUG: Is binary classification from checkpoint: {self.is_binary_classification}"
+        )
+        print(
+            f"DEBUG: ViT model_name_or_path (used if arch is ViT): {self.model_name_or_path}"
+        )
 
         self.model_filename = os.path.basename(self.model_path)
 
