@@ -148,6 +148,9 @@ def run_experiment_1():
             lr_input = 0.001
         lr_config = [lr_input]
         experiment_params["learning_rate"] = lr_config[0]
+        # Get scheduler preferences
+        
+        use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
         # Create trainer
         trainer = ModelTrainer(
@@ -157,6 +160,8 @@ def run_experiment_1():
             learning_rate=lr_config,
             monitor_gradients=monitor_gradients,
             gradient_monitor_interval=gradient_monitor_interval,
+            use_scheduler=use_scheduler,
+            scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None
         )
 
         # Display Swedish humor
@@ -301,6 +306,8 @@ def run_experiment_1_semi_supervised():
         lr_input = 0.001
     lr_config = [lr_input]
     experiment_params["learning_rate"] = lr_config[0]
+    
+    use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
     trainer = ModelTrainer(
         model,
@@ -309,6 +316,8 @@ def run_experiment_1_semi_supervised():
         learning_rate=lr_config,
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
+        use_scheduler=use_scheduler,
+        scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None,
     )
 
     print("\nTraining on labeled subset...")
@@ -688,6 +697,8 @@ def run_experiment_2_semi_supervised():
 
     l2_lambda_val = 0.0  # Default for this function
     experiment_params["l2_lambda"] = l2_lambda_val
+    
+    use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
     trainer = ModelTrainer(
         model,
@@ -700,6 +711,8 @@ def run_experiment_2_semi_supervised():
         ),
         finetune_bn=finetune_bn_val,
         lam=l2_lambda_val,
+        use_scheduler=use_scheduler,
+        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -938,7 +951,10 @@ def run_experiment_2():
 
         l2_lambda_r2 = 0.0  # Default for this experiment flow
         experiment_params["l2_lambda"] = l2_lambda_r2
+            
+        use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
+        # Create trainer
         trainer = ModelTrainer(
             model,
             device,
@@ -950,6 +966,8 @@ def run_experiment_2():
             ),
             finetune_bn=finetune_bn_r2,
             lam=l2_lambda_r2,
+            use_scheduler=use_scheduler,
+            scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None,
         )
 
         print(f"\n{get_swedish_waiting_message()}")
@@ -1123,6 +1141,8 @@ def run_experiment_vit_binary():
 
         l2_lambda_vit = 0.0  # Default
         experiment_params["l2_lambda"] = l2_lambda_vit
+        
+        use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
         trainer = ModelTrainer(
             model,
@@ -1135,6 +1155,8 @@ def run_experiment_vit_binary():
             ),
             finetune_bn=finetune_bn_vit,  # Passed, though ModelTrainer's BN logic primarily targets ResNet BatchNorm layers
             lam=l2_lambda_vit,
+            use_scheduler=use_scheduler,
+            scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
         )
 
         print(f"\n{get_swedish_waiting_message()}")
@@ -1308,6 +1330,8 @@ def run_experiment_vit_binary_semi():
 
     l2_lambda_vit_semi = 0.0  # Default
     experiment_params["l2_lambda"] = l2_lambda_vit_semi
+    
+    use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
     trainer = ModelTrainer(
         model,
@@ -1320,6 +1344,8 @@ def run_experiment_vit_binary_semi():
         ),
         finetune_bn=finetune_bn_vit_semi,
         lam=l2_lambda_vit_semi,
+        use_scheduler=use_scheduler,
+        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -1492,6 +1518,8 @@ def run_experiment_vit_multiclass_semi():
 
     l2_lambda_vit_mc_semi = 0.0
     experiment_params["l2_lambda"] = l2_lambda_vit_mc_semi
+    
+    use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
     trainer = ModelTrainer(
         model,
@@ -1506,6 +1534,8 @@ def run_experiment_vit_multiclass_semi():
         ),
         finetune_bn=finetune_bn_vit_mc_semi,
         lam=l2_lambda_vit_mc_semi,
+        use_scheduler=use_scheduler,
+        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -1701,6 +1731,8 @@ def run_experiment_vit_multiclass_imbalanced():
 
     l2_lambda_vit_imbal = 0.0  # Default
     experiment_params["l2_lambda"] = l2_lambda_vit_imbal
+    
+    use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
     trainer = ModelTrainer(
         model,
@@ -1714,6 +1746,8 @@ def run_experiment_vit_multiclass_imbalanced():
         loss_fn=loss_fn_choice,  # Pass the chosen loss function
         finetune_bn=finetune_bn_vit_imbal,
         lam=l2_lambda_vit_imbal,
+        use_scheduler=use_scheduler,
+        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -1877,7 +1911,8 @@ def run_experiment_vit_multiclass():
 
         l2_lambda_vit_mc = 0.0  # Default for ViT supervised
         experiment_params["l2_lambda"] = l2_lambda_vit_mc
-
+        
+        use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
         trainer = ModelTrainer(
             model,
             device,
@@ -1889,6 +1924,8 @@ def run_experiment_vit_multiclass():
             ),
             finetune_bn=finetune_bn_vit_mc,  # Passed, though ModelTrainer's BN logic primarily targets ResNet
             lam=l2_lambda_vit_mc,
+            use_scheduler=use_scheduler,
+            scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
         )
 
         print(f"\n{get_swedish_waiting_message()}")
