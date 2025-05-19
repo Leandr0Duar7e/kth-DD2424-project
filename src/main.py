@@ -78,7 +78,6 @@ def run_experiment_1():
 
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
-        #PUT SOMEWHERE THE IMBALANCED
         # Load data
         print("\nLoading Oxford-IIIT Pet Dataset...")
         train_loader, val_loader, test_loader, num_classes = (
@@ -131,9 +130,13 @@ def run_experiment_1():
         print(f"\n{get_swedish_waiting_message()}")
 
         # Train model
+        start_time = time.time()
         model, history = trainer.train(
             train_loader, val_loader, num_epochs=2, print_graph=True
         )
+        end_time = time.time()
+        training_time = end_time - start_time
+        print(f"Training completed in {training_time:.2f} seconds.")
 
         # Save model
         save_choice = input("\nDo you want to save the model? (y/n): ").lower()
@@ -235,6 +238,7 @@ def run_experiment_1_semi_supervised():
             ]
         )
 
+
 def run_experiment_imbalanced_multiclass():
     print("\n" + "=" * 70)
     print("Starting experiment: ResNet50 MULTICLASS with imbalanced training set")
@@ -248,16 +252,16 @@ def run_experiment_imbalanced_multiclass():
     strategy = int(input("Choose strategy (1/2/3): ").strip())
 
     user_input = int(
-                input(
-                    "\nInsert the number of layers to train (last layer excluded): "
-                )
-            )
+        input("\nInsert the number of layers to train (last layer excluded): ")
+    )
     # Load imbalanced data
-    train_loader, val_loader, test_loader, num_classes = OxfordPetDataset.get_dataloaders(
-        data_dir="../data/raw",
-        batch_size=32,
-        binary_classification=False,
-        apply_imbalance=True,
+    train_loader, val_loader, test_loader, num_classes = (
+        OxfordPetDataset.get_dataloaders(
+            data_dir="../data/raw",
+            batch_size=32,
+            binary_classification=False,
+            apply_imbalance=True,
+        )
     )
 
     # Apply oversampling if selected
@@ -269,14 +273,18 @@ def run_experiment_imbalanced_multiclass():
     print("\nInitializing ResNet50 model...")
     for _ in tqdm(range(5), desc="Loading model"):
         time.sleep(0.2)
-    model = ResNet50(binary_classification=False, freeze_backbone=True, num_train_layers=user_input)
+    model = ResNet50(
+        binary_classification=False, freeze_backbone=True, num_train_layers=user_input
+    )
 
     device = get_device()
 
     # Weighted loss
     if strategy == 2:
         print("Using weighted CrossEntropyLoss...")
-        class_weights = compute_class_weights(train_loader.dataset, num_classes).to(device)
+        class_weights = compute_class_weights(train_loader.dataset, num_classes).to(
+            device
+        )
         loss_fn = nn.CrossEntropyLoss(weight=class_weights)
     else:
         loss_fn = nn.CrossEntropyLoss()
@@ -291,7 +299,11 @@ def run_experiment_imbalanced_multiclass():
     )
 
     # Train
+    start_time = time.time()
     model, _ = trainer.train(train_loader, val_loader, num_epochs=3, print_graph=True)
+    end_time = time.time()
+    training_time = end_time - start_time
+    print(f"Training completed in {training_time:.2f} seconds.")
 
     # Evaluate
     print("\nEvaluating on test set...")
@@ -546,15 +558,23 @@ def run_experiment_2():
 
         # Train model
         if user_input == -1:
-
+            start_time = time.time()
             model, history = trainer.train_gradual_unfreezing(
                 train_loader, val_loader, num_epochs=1, print_graph=True
             )
+            end_time = time.time()
+            training_time = end_time - start_time
+            print(
+                f"Training (gradual unfreezing) completed in {training_time:.2f} seconds."
+            )
         else:
-
+            start_time = time.time()
             model, history = trainer.train(
                 train_loader, val_loader, num_epochs=1, print_graph=True
             )
+            end_time = time.time()
+            training_time = end_time - start_time
+            print(f"Training completed in {training_time:.2f} seconds.")
 
         # Save model
         save_choice = input("\nDo you want to save the model? (y/n): ").lower()
@@ -644,9 +664,13 @@ def run_experiment_vit_binary():
         print(f"\n{get_swedish_waiting_message()}")
 
         # Train model
+        start_time = time.time()
         model, history = trainer.train(
             train_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
         )
+        end_time = time.time()
+        training_time = end_time - start_time
+        print(f"Training completed in {training_time:.2f} seconds.")
 
         # Save model
         save_choice = input("\nDo you want to save the model? (y/n): ").lower()
@@ -729,9 +753,13 @@ def run_experiment_vit_binary_semi():
     print(f"\n{get_swedish_waiting_message()}")
 
     # Train model
+    start_time = time.time()
     model, _ = trainer.train(
         labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
     )
+    end_time = time.time()
+    training_time = end_time - start_time
+    print(f"Training completed in {training_time:.2f} seconds.")
 
     print("\nGenerating pseudo-labels...")
     pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
@@ -739,9 +767,14 @@ def run_experiment_vit_binary_semi():
     print("\nTraining on combined labeled + pseudo-labeled data...")
     combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
 
+    start_time = time.time()
     model, _ = trainer.train(
         combined_loader, val_loader, num_epochs=3, print_graph=True
     )
+    end_time = time.time()
+    training_time = end_time - start_time
+    print(f"Training completed in {training_time:.2f} seconds.")
+
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
     print(f"\nFinal Test Accuracy: {test_acc:.2f}% | Loss: {test_loss:.4f}")
@@ -833,47 +866,52 @@ def run_experiment_vit_multiclass_semi():
         f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%"
     )  # .2f for multiclass as in run_exp2
 
+
 def run_experiment_vit_multiclass_imbalanced():
     print("\n" + "=" * 70)
     print("Starting experiment: ViT MULTICLASS with imbalanced training set")
     print("=" * 70)
-    
+
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = 3  # Example, can be configured. More epochs might be needed for multi-class.
+    num_epochs_vit = (
+        3  # Example, can be configured. More epochs might be needed for multi-class.
+    )
     batch_size_vit = 32  # Adjust based on GPU memory
 
     print("\nStrategy options to handle imbalance:")
     print("1. No strategy (baseline)")
     print("2. Weighted CrossEntropyLoss")
     print("3. Oversampling minority classes")
-    
+
     strategy = int(input("Choose strategy (1/2/3): ").strip())
     vit_model_checkpoint = "google/vit-base-patch16-224"
     num_epochs_vit = 3
     batch_size = 32
-    
+
     # Load data
-    train_loader, val_loader, test_loader, num_classes = OxfordPetDataset.get_dataloaders(
-        data_dir="../data/raw",
-        batch_size=batch_size_vit,
-        binary_classification=False,
-        model_type="vit",
-        vit_model_name=vit_model_checkpoint,
-        apply_imbalance=True,
+    train_loader, val_loader, test_loader, num_classes = (
+        OxfordPetDataset.get_dataloaders(
+            data_dir="../data/raw",
+            batch_size=batch_size_vit,
+            binary_classification=False,
+            model_type="vit",
+            vit_model_name=vit_model_checkpoint,
+            apply_imbalance=True,
+        )
     )
     print(
         f"Dataset loaded for ViT multi-class classification! ({len(train_loader.dataset)} training samples)"
     )
-    
+
     if strategy == 3:
         print("Applying oversampling to rebalance classes...")
-        train_loader = get_oversampled_loader(train_loader.dataset, batch_size=batch_size)
-    
+        train_loader = get_oversampled_loader(
+            train_loader.dataset, batch_size=batch_size
+        )
+
     # Load model
     print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
-    model = ViT(
-        model_name_or_path=vit_model_checkpoint, binary_classification=False
-    )
+    model = ViT(model_name_or_path=vit_model_checkpoint, binary_classification=False)
 
     # Get device
     device = get_device()
@@ -881,22 +919,20 @@ def run_experiment_vit_multiclass_imbalanced():
     # Use class weights if selected
     if strategy == 2:
         print("Using weighted CrossEntropyLoss...")
-        class_weights = compute_class_weights(train_loader.dataset, num_classes).to(device)
+        class_weights = compute_class_weights(train_loader.dataset, num_classes).to(
+            device
+        )
         loss_fn = nn.CrossEntropyLoss(weight=class_weights)
     else:
         loss_fn = nn.CrossEntropyLoss()
-        
+
     # Ask for gradient monitoring
-    monitor_grads_choice = input(
-        "\nDo you want to monitor gradients? (y/n): "
-    ).lower()
+    monitor_grads_choice = input("\nDo you want to monitor gradients? (y/n): ").lower()
     monitor_gradients = monitor_grads_choice == "y"
     gradient_monitor_interval = 100  # Default
     if monitor_gradients:
         try:
-            interval = int(
-                input("Monitor gradients every N batches (e.g., 50, 100): ")
-            )
+            interval = int(input("Monitor gradients every N batches (e.g., 50, 100): "))
             if interval > 0:
                 gradient_monitor_interval = interval
             else:
@@ -921,9 +957,13 @@ def run_experiment_vit_multiclass_imbalanced():
     # Train model
     # For multi-class ViT, gradual unfreezing could be explored later if needed.
     # For now, standard fine-tuning.
+    start_time = time.time()
     model, _ = trainer.train(
         train_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
     )
+    end_time = time.time()
+    training_time = end_time - start_time
+    print(f"Training completed in {training_time:.2f} seconds.")
 
     # Save model
     save_choice = input("\nDo you want to save the model? (y/n): ").lower()
@@ -934,9 +974,8 @@ def run_experiment_vit_multiclass_imbalanced():
     print("\nEvaluating ViT model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
     print("\nFinal Test Results (ViT Multi-class):")
-    print(
-        f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%"
-    )
+    print(f"Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%")
+
 
 def run_experiment_vit_multiclass():
     """Run ViT multi-class classification experiment"""
@@ -1005,9 +1044,13 @@ def run_experiment_vit_multiclass():
         # Train model
         # For multi-class ViT, gradual unfreezing could be explored later if needed.
         # For now, standard fine-tuning.
+        start_time = time.time()
         model, history = trainer.train(
             train_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
         )
+        end_time = time.time()
+        training_time = end_time - start_time
+        print(f"Training completed in {training_time:.2f} seconds.")
 
         # Save model
         save_choice = input("\nDo you want to save the model? (y/n): ").lower()
