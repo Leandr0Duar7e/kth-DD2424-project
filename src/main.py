@@ -78,6 +78,17 @@ def run_experiment_1():
 
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
+        try:
+            num_epochs = int(
+                input("Enter the number of epochs for supervised training (e.g., 2): ")
+            )
+            if num_epochs <= 0:
+                print("Number of epochs must be positive. Using default: 2.")
+                num_epochs = 2
+        except ValueError:
+            print("Invalid input for epochs. Using default: 2.")
+            num_epochs = 2
+
         # Load data
         print("\nLoading Oxford-IIIT Pet Dataset...")
         train_loader, val_loader, test_loader, num_classes = (
@@ -132,7 +143,7 @@ def run_experiment_1():
         # Train model
         start_time = time.time()
         model, history = trainer.train(
-            train_loader, val_loader, num_epochs=2, print_graph=True
+            train_loader, val_loader, num_epochs=num_epochs, print_graph=True
         )
         end_time = time.time()
         training_time = end_time - start_time
@@ -158,6 +169,27 @@ def run_experiment_1():
 
 def run_experiment_1_semi_supervised():
     print("\nRunning semi-supervised experiment (binary classification)...")
+
+    try:
+        num_epochs_labeled = int(
+            input("Enter epochs for initial training on labeled data (e.g., 3): ")
+        )
+        if num_epochs_labeled <= 0:
+            print("Number of epochs must be positive. Using default: 3.")
+            num_epochs_labeled = 3
+    except ValueError:
+        print("Invalid input for epochs. Using default: 3.")
+        num_epochs_labeled = 3
+    try:
+        num_epochs_combined = int(
+            input("Enter epochs for training on combined data (e.g., 3): ")
+        )
+        if num_epochs_combined <= 0:
+            print("Number of epochs must be positive. Using default: 3.")
+            num_epochs_combined = 3
+    except ValueError:
+        print("Invalid input for epochs. Using default: 3.")
+        num_epochs_combined = 3
 
     num_layers = int(
         input("Insert the number of layers to train (last layer excluded): ")
@@ -212,14 +244,16 @@ def run_experiment_1_semi_supervised():
     )
 
     print("\nTraining on labeled subset...")
-    model, _ = trainer.train(labeled_loader, val_loader, num_epochs=3)
+    model, _ = trainer.train(labeled_loader, val_loader, num_epochs=num_epochs_labeled)
 
     print("\nGenerating pseudo-labels...")
     pseudo_loader = trainer.generate_pseudo_labels(model, unlabeled_loader)
 
     print("\nTraining on combined labeled + pseudo-labeled data...")
     combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
-    model, _ = trainer.train(combined_loader, val_loader, num_epochs=3)
+    model, _ = trainer.train(
+        combined_loader, val_loader, num_epochs=num_epochs_combined
+    )
 
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -314,6 +348,27 @@ def run_experiment_imbalanced_multiclass():
 def run_experiment_2_semi_supervised():
     print("\nRunning semi-supervised experiment (multi-class classification)...")
 
+    try:
+        num_epochs_labeled = int(
+            input("Enter epochs for initial training on labeled data (e.g., 3): ")
+        )
+        if num_epochs_labeled <= 0:
+            print("Number of epochs must be positive. Using default: 3.")
+            num_epochs_labeled = 3
+    except ValueError:
+        print("Invalid input for epochs. Using default: 3.")
+        num_epochs_labeled = 3
+    try:
+        num_epochs_combined = int(
+            input("Enter epochs for training on combined data (e.g., 3): ")
+        )
+        if num_epochs_combined <= 0:
+            print("Number of epochs must be positive. Using default: 3.")
+            num_epochs_combined = 3
+    except ValueError:
+        print("Invalid input for epochs. Using default: 3.")
+        num_epochs_combined = 3
+
     user_input = int(
         input(
             "\nSelect training option: \n n>0: train n layers \n '-1': gradually unfreeze each layer \n '-2': different learning rate for each layer and no data augmentation \n '-3': different learning rates for each layer and data augmentation \n User input: "
@@ -400,13 +455,13 @@ def run_experiment_2_semi_supervised():
     if user_input == -1:
         print("\nStarting training with Gradual Unfreezing on labeled data...")
         model, _ = trainer.train_gradual_unfreezing(
-            labeled_loader, val_loader, num_epochs=3, print_graph=True
+            labeled_loader, val_loader, num_epochs=num_epochs_labeled, print_graph=True
         )
 
     else:
 
         model, history = trainer.train(
-            labeled_loader, val_loader, num_epochs=3, print_graph=True
+            labeled_loader, val_loader, num_epochs=num_epochs_labeled, print_graph=True
         )
 
     print("\nGenerating pseudo-labels...")
@@ -418,12 +473,18 @@ def run_experiment_2_semi_supervised():
     if user_input == -1:
         print("\nStarting training with Gradual Unfreezing on labeled data...")
         model, _ = trainer.train_gradual_unfreezing(
-            combined_loader, val_loader, num_epochs=3, print_graph=True
+            combined_loader,
+            val_loader,
+            num_epochs=num_epochs_combined,
+            print_graph=True,
         )
     else:
         # TODO: ADD LEARNING RATES
         model, history = trainer.train(
-            combined_loader, val_loader, num_epochs=3, print_graph=True
+            combined_loader,
+            val_loader,
+            num_epochs=num_epochs_combined,
+            print_graph=True,
         )
 
     print("\nEvaluating final model on test set...")
@@ -600,11 +661,21 @@ def run_experiment_vit_binary():
     print("=" * 70)
 
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = 3  # can be configured
+    num_epochs_vit = 2
     batch_size_vit = 32
 
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
+        try:
+            num_epochs_vit = int(
+                input("Enter the number of epochs for ViT training (e.g., 2): ")
+            )
+            if num_epochs_vit <= 0:
+                print("Number of epochs must be positive. Using default: 2.")
+                num_epochs_vit = 2
+        except ValueError:
+            print("Invalid input for epochs. Using default: 2.")
+            num_epochs_vit = 2
         # Load data
         train_loader, val_loader, test_loader, _ = OxfordPetDataset.get_dataloaders(
             data_dir="../data/raw",
@@ -696,8 +767,29 @@ def run_experiment_vit_binary_semi():
     print("=" * 70)
 
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = 3  # can be configured
+    num_epochs_vit = 2
     batch_size_vit = 32
+
+    try:
+        num_epochs_labeled_vit = int(
+            input("Enter epochs for initial ViT training on labeled data (e.g., 3): ")
+        )
+        if num_epochs_labeled_vit <= 0:
+            print("Number of epochs must be positive. Using default: 3.")
+            num_epochs_labeled_vit = 3
+    except ValueError:
+        print("Invalid input for epochs. Using default: 3.")
+        num_epochs_labeled_vit = 3
+    try:
+        num_epochs_combined_vit = int(
+            input("Enter epochs for ViT training on combined data (e.g., 3): ")
+        )
+        if num_epochs_combined_vit <= 0:
+            print("Number of epochs must be positive. Using default: 3.")
+            num_epochs_combined_vit = 3
+    except ValueError:
+        print("Invalid input for epochs. Using default: 3.")
+        num_epochs_combined_vit = 3
 
     label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
 
@@ -755,7 +847,7 @@ def run_experiment_vit_binary_semi():
     # Train model
     start_time = time.time()
     model, _ = trainer.train(
-        labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
+        labeled_loader, val_loader, num_epochs=num_epochs_labeled_vit, print_graph=True
     )
     end_time = time.time()
     training_time = end_time - start_time
@@ -769,7 +861,10 @@ def run_experiment_vit_binary_semi():
 
     start_time = time.time()
     model, _ = trainer.train(
-        combined_loader, val_loader, num_epochs=3, print_graph=True
+        combined_loader,
+        val_loader,
+        num_epochs=num_epochs_combined_vit,
+        print_graph=True,
     )
     end_time = time.time()
     training_time = end_time - start_time
@@ -782,10 +877,29 @@ def run_experiment_vit_binary_semi():
 
 def run_experiment_vit_multiclass_semi():
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = (
-        3  # Example, can be configured. More epochs might be needed for multi-class.
-    )
+
     batch_size_vit = 32  # Adjust based on GPU memory
+
+    try:
+        num_epochs_labeled_vit = int(
+            input("Enter epochs for initial ViT training on labeled data (e.g., 6): ")
+        )
+        if num_epochs_labeled_vit <= 0:
+            print("Number of epochs must be positive. Using default: 6.")
+            num_epochs_labeled_vit = 6
+    except ValueError:
+        print("Invalid input for epochs. Using default: 6.")
+        num_epochs_labeled_vit = 6
+    try:
+        num_epochs_combined_vit = int(
+            input("Enter epochs for ViT training on combined data (e.g., 6): ")
+        )
+        if num_epochs_combined_vit <= 0:
+            print("Number of epochs must be positive. Using default: 6.")
+            num_epochs_combined_vit = 6
+    except ValueError:
+        print("Invalid input for epochs. Using default: 6.")
+        num_epochs_combined_vit = 6
 
     label_fraction = float(input("Enter labeled data fraction (e.g., 0.1 for 10%): "))
 
@@ -837,7 +951,7 @@ def run_experiment_vit_multiclass_semi():
     # For multi-class ViT, gradual unfreezing could be explored later if needed.
     # For now, standard fine-tuning.
     model, history = trainer.train(
-        labeled_loader, val_loader, num_epochs=num_epochs_vit, print_graph=True
+        labeled_loader, val_loader, num_epochs=num_epochs_labeled_vit, print_graph=True
     )
 
     print("\nGenerating pseudo-labels...")
@@ -847,7 +961,10 @@ def run_experiment_vit_multiclass_semi():
     combined_loader = trainer.combine_loaders(labeled_loader, pseudo_loader)
 
     model, _ = trainer.train(
-        combined_loader, val_loader, num_epochs=3, print_graph=True
+        combined_loader,
+        val_loader,
+        num_epochs=num_epochs_combined_vit,
+        print_graph=True,
     )
     print("\nEvaluating final model on test set...")
     test_loss, test_acc = trainer.evaluate(test_loader)
@@ -873,9 +990,16 @@ def run_experiment_vit_multiclass_imbalanced():
     print("=" * 70)
 
     vit_model_checkpoint = "google/vit-base-patch16-224"
-    num_epochs_vit = (
-        3  # Example, can be configured. More epochs might be needed for multi-class.
-    )
+    try:
+        num_epochs_vit = int(
+            input("Enter the number of epochs for ViT training (e.g., 6): ")
+        )
+        if num_epochs_vit <= 0:
+            print("Number of epochs must be positive. Using default: 6.")
+            num_epochs_vit = 6
+    except ValueError:
+        print("Invalid input for epochs. Using default: 6.")
+        num_epochs_vit = 6
     batch_size_vit = 32  # Adjust based on GPU memory
 
     print("\nStrategy options to handle imbalance:")
@@ -986,7 +1110,16 @@ def run_experiment_vit_multiclass():
     choice = input("Choose training type:\n1. Supervised\n2. Semi-supervised\n> ")
     if choice == "1":
         vit_model_checkpoint = "google/vit-base-patch16-224"
-        num_epochs_vit = 3  # Example, can be configured. More epochs might be needed for multi-class.
+        try:
+            num_epochs_vit = int(
+                input("Enter the number of epochs for ViT training (default: 6): ")
+            )
+            if num_epochs_vit <= 0:
+                print("Number of epochs must be positive. Using default: 6.")
+                num_epochs_vit = 6
+        except ValueError:
+            print("Invalid input for epochs. Using default: 6.")
+            num_epochs_vit = 6
         batch_size_vit = 32  # Adjust based on GPU memory
 
         # Load data
