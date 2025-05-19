@@ -117,6 +117,10 @@ def run_experiment_1():
             except ValueError:
                 print("Invalid input, using default interval 100.")
 
+        # Get scheduler preferences
+        
+        use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
+
         # Create trainer
         trainer = ModelTrainer(
             model,
@@ -125,6 +129,8 @@ def run_experiment_1():
             learning_rate=[0.001],
             monitor_gradients=monitor_gradients,
             gradient_monitor_interval=gradient_monitor_interval,
+            use_scheduler=use_scheduler,
+            scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None
         )
 
         # Display Swedish humor
@@ -530,16 +536,22 @@ def run_experiment_2():
             ]
         else:
             learning_rates = [5e-5]
+            
+        use_scheduler = input("\nWould you like to use the learning rate scheduler? (y/n): ").lower() == 'y'
 
+        # Create trainer
         trainer = ModelTrainer(
             model,
             device,
             binary_classification=False,
-            learning_rate=learning_rates,
+            learning_rate=[0.001],
             monitor_gradients=monitor_gradients,
             gradient_monitor_interval=gradient_monitor_interval,
             finetune_bn=finetune_bn,
+            use_scheduler=use_scheduler,
+            scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None
         )
+
 
         # Display Swedish humor
         print(f"\n{get_swedish_waiting_message()}")
