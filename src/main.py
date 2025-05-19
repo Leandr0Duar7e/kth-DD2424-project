@@ -161,7 +161,7 @@ def run_experiment_1():
             monitor_gradients=monitor_gradients,
             gradient_monitor_interval=gradient_monitor_interval,
             use_scheduler=use_scheduler,
-            scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None
+            scheduler_params={ 'pct_start': 0.3} if use_scheduler else None
         )
 
         # Display Swedish humor
@@ -317,7 +317,7 @@ def run_experiment_1_semi_supervised():
         monitor_gradients=monitor_gradients,
         gradient_monitor_interval=gradient_monitor_interval,
         use_scheduler=use_scheduler,
-        scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None,
+        scheduler_params={'pct_start': 0.3} if use_scheduler else None,
     )
 
     print("\nTraining on labeled subset...")
@@ -712,7 +712,7 @@ def run_experiment_2_semi_supervised():
         finetune_bn=finetune_bn_val,
         lam=l2_lambda_val,
         use_scheduler=use_scheduler,
-        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
+        scheduler_params={'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -967,7 +967,7 @@ def run_experiment_2():
             finetune_bn=finetune_bn_r2,
             lam=l2_lambda_r2,
             use_scheduler=use_scheduler,
-            scheduler_params={'max_lr': 1e-2, 'pct_start': 0.3} if use_scheduler else None,
+            scheduler_params={ 'pct_start': 0.3} if use_scheduler else None,
         )
 
         print(f"\n{get_swedish_waiting_message()}")
@@ -1156,7 +1156,7 @@ def run_experiment_vit_binary():
             finetune_bn=finetune_bn_vit,  # Passed, though ModelTrainer's BN logic primarily targets ResNet BatchNorm layers
             lam=l2_lambda_vit,
             use_scheduler=use_scheduler,
-            scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
+            scheduler_params={ 'pct_start': 0.3} if use_scheduler else None,
         )
 
         print(f"\n{get_swedish_waiting_message()}")
@@ -1345,7 +1345,7 @@ def run_experiment_vit_binary_semi():
         finetune_bn=finetune_bn_vit_semi,
         lam=l2_lambda_vit_semi,
         use_scheduler=use_scheduler,
-        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
+        scheduler_params={'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -1535,7 +1535,7 @@ def run_experiment_vit_multiclass_semi():
         finetune_bn=finetune_bn_vit_mc_semi,
         lam=l2_lambda_vit_mc_semi,
         use_scheduler=use_scheduler,
-        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
+        scheduler_params={'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -1747,7 +1747,7 @@ def run_experiment_vit_multiclass_imbalanced():
         finetune_bn=finetune_bn_vit_imbal,
         lam=l2_lambda_vit_imbal,
         use_scheduler=use_scheduler,
-        scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
+        scheduler_params={ 'pct_start': 0.3} if use_scheduler else None,
     )
 
     print(f"\n{get_swedish_waiting_message()}")
@@ -1925,7 +1925,7 @@ def run_experiment_vit_multiclass():
             finetune_bn=finetune_bn_vit_mc,  # Passed, though ModelTrainer's BN logic primarily targets ResNet
             lam=l2_lambda_vit_mc,
             use_scheduler=use_scheduler,
-            scheduler_params={'max_lr': 1e-3, 'pct_start': 0.3} if use_scheduler else None,
+            scheduler_params={'pct_start': 0.3} if use_scheduler else None,
         )
 
         print(f"\n{get_swedish_waiting_message()}")

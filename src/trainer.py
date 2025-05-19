@@ -212,23 +212,39 @@ class ModelTrainer:
 
         if self.use_scheduler:
             print("Using OneCycleLR scheduler with warm-up and cosine annealing")
-            # Calculate total steps for OneCycleLR
             steps_per_epoch = len(train_loader)
             total_steps = steps_per_epoch * num_epochs
             
-            # Get scheduler parameters
-            max_lr = self.scheduler_params.get('max_lr', 
-                self.learning_rates[0] if isinstance(self.learning_rates, list) else self.learning_rates)
-            pct_start = self.scheduler_params.get('pct_start', 0.3)  # Default 30% of training for warm-up
+            # Handle multiple learning rates
+            if isinstance(self.learning_rates, list) and len(self.learning_rates) > 1:
+                print("Multiple learning rates detected for different parameter groups")
+                # Get the base learning rates for each parameter group
+                base_lrs = [group['lr'] for group in self.optimizer.param_groups]
+                # Calculate max_lrs for each group (10x their base learning rate)
+                max_lrs = [lr * 10 for lr in base_lrs]
+                
+                print("Learning rate ranges for each parameter group:")
+                for i, (base_lr, max_lr) in enumerate(zip(base_lrs, max_lrs)):
+                    print(f"Group {i}: {base_lr:.2e} -> {max_lr:.2e}")
+            else:
+                # Single learning rate case
+                base_lr = self.optimizer.param_groups[0]['lr']
+                max_lr = self.scheduler_params.get('max_lr', base_lr * 10)
+                max_lrs = [max_lr]  # OneCycleLR expects a list even for single lr
+                print(f"Base learning rate: {base_lr:.2e}")
+                print(f"Maximum learning rate: {max_lr:.2e}")
+            
+            pct_start = self.scheduler_params.get('pct_start', 0.3)
+            print(f"Warm-up percentage: {pct_start*100:.0f}%")
             
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
-                max_lr=max_lr,
+                max_lr=max_lrs,  # Now handles both single and multiple learning rates
                 total_steps=total_steps,
                 pct_start=pct_start,
                 anneal_strategy='cos',
-                div_factor=25.0,  # Initial lr = max_lr/25
-                final_div_factor=10000.0,  # Final lr = initial_lr/10000
+                div_factor=25.0,
+                final_div_factor=10000.0,
             )
 
         # Reset history for a new training session
@@ -362,12 +378,51 @@ class ModelTrainer:
         if not self.finetune_bn:
             print("Batch normalization parameters are frozen (not being fine-tuned)")
 
+        # Initialize scheduler if requested
+        if self.use_scheduler:
+            print("Using OneCycleLR scheduler with warm-up and cosine annealing")
+            steps_per_epoch = len(train_loader)
+            total_steps = steps_per_epoch * num_epochs
+            
+            # Handle multiple learning rates
+            if isinstance(self.learning_rates, list) and len(self.learning_rates) > 1:
+                print("Multiple learning rates detected for different parameter groups")
+                # Get the base learning rates for each parameter group
+                base_lrs = [group['lr'] for group in self.optimizer.param_groups]
+                # Calculate max_lrs for each group (10x their base learning rate)
+                max_lrs = [lr * 10 for lr in base_lrs]
+                
+                print("Learning rate ranges for each parameter group:")
+                for i, (base_lr, max_lr) in enumerate(zip(base_lrs, max_lrs)):
+                    print(f"Group {i}: {base_lr:.2e} -> {max_lr:.2e}")
+            else:
+                # Single learning rate case
+                base_lr = self.optimizer.param_groups[0]['lr']
+                max_lr = self.scheduler_params.get('max_lr', base_lr * 10)
+                max_lrs = [max_lr]  # OneCycleLR expects a list even for single lr
+                print(f"Base learning rate: {base_lr:.2e}")
+                print(f"Maximum learning rate: {max_lr:.2e}")
+            
+            pct_start = self.scheduler_params.get('pct_start', 0.3)
+            print(f"Warm-up percentage: {pct_start*100:.0f}%")
+            
+            self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                max_lr=max_lrs,
+                total_steps=total_steps,
+                pct_start=pct_start,
+                anneal_strategy='cos',
+                div_factor=25.0,
+                final_div_factor=10000.0,
+            )
+
         # Reset history for a new training session
         self.history = {
             "train_loss": [],
             "train_acc": [],
             "val_loss": [],
             "val_acc": [],
+            "learning_rates": [],  # Add this to track learning rates
         }
 
         tot_num_steps = len(train_loader) * num_epochs
@@ -465,6 +520,12 @@ class ModelTrainer:
 
                 self.optimizer.step()
 
+                # Step the scheduler (per batch)
+                if self.use_scheduler:
+                    self.scheduler.step()
+                    current_lr = self.scheduler.get_last_lr()[0]
+                    self.history["learning_rates"].append(current_lr)
+                    
                 train_loss += loss.item()
                 predicted = (
                     (torch.sigmoid(outputs) > 0.5).float()
