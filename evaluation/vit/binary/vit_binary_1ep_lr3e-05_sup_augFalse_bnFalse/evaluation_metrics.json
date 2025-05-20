@@ -1,0 +1,38 @@
+{
+    "model_filename": "vit_binary_1ep_lr3e-05_sup_augFalse_bnFalse.pth",
+    "model_architecture": "vit",
+    "classification_type": "binary",
+    "num_classes_model": 1,
+    "test_accuracy": 0.7948369565217391,
+    "test_loss": 0.5312408221804578,
+    "classification_report": {
+        "Cat": {
+            "precision": 0.6270718232044199,
+            "recall": 0.934156378600823,
+            "f1-score": 0.7504132231404959,
+            "support": 243.0
+        },
+        "Dog": {
+            "precision": 0.9572192513368984,
+            "recall": 0.7261663286004056,
+            "f1-score": 0.825836216839677,
+            "support": 493.0
+        },
+        "accuracy": 0.7948369565217391,
+        "macro avg": {
+            "precision": 0.7921455372706592,
+            "recall": 0.8301613536006143,
+            "f1-score": 0.7881247199900865,
+            "support": 736.0
+        },
+        "weighted avg": {
+            "precision": 0.848216771668159,
+            "recall": 0.7948369565217391,
+            "f1-score": 0.8009343316917136,
+            "support": 736.0
+        }
+    },
+    "roc_auc": 0.9318692142672309,
+    "pr_auc": 0.9633324834859056,
+    "roc_auc_ovr_weighted": null
+}
