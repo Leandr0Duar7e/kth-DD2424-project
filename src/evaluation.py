@@ -481,6 +481,39 @@ class ModelEvaluator:
         all_preds = np.array(all_preds_list)
         all_labels = np.array(all_labels_list)
 
+        # Calculate test loss (average over all test batches)
+        total_test_loss = 0.0
+        test_criterion = (
+            torch.nn.BCEWithLogitsLoss()
+            if self.is_binary_classification
+            else torch.nn.CrossEntropyLoss()
+        )
+        self.model.eval()
+        with torch.no_grad():
+            for inputs, labels_batch in self.test_loader:
+                inputs, labels_batch = inputs.to(self.device), labels_batch.to(
+                    self.device
+                )
+                outputs = self.model(inputs)
+                logits_for_eval = (
+                    outputs.logits if hasattr(outputs, "logits") else outputs
+                )
+
+                # Ensure labels are the correct type for the loss function
+                if self.is_binary_classification:
+                    labels_for_loss = labels_batch.float()
+                else:
+                    labels_for_loss = labels_batch.long()
+
+                loss = test_criterion(logits_for_eval.squeeze(), labels_for_loss)
+                total_test_loss += loss.item()
+
+        avg_test_loss = (
+            total_test_loss / len(self.test_loader)
+            if len(self.test_loader) > 0
+            else 0.0
+        )
+
         # Convert all_probs_for_metrics_list to a single NumPy array
         # If binary, it was a list of scalars (P(class_1)), so np.array makes it (n_samples,)
         # If multiclass, it was a list of 1D arrays (one per sample, if extend was used on individual sample probs)
@@ -548,10 +581,47 @@ class ModelEvaluator:
         all_preds = np.array(all_preds_list_corrected)
         all_labels = np.array(all_labels_list_corrected)
 
+        # Calculate test loss (average over all test batches)
+        total_test_loss = 0.0
+        # Ensure the criterion is correctly initialized for the current model
+        test_criterion = (
+            torch.nn.BCEWithLogitsLoss()
+            if self.is_binary_classification
+            else torch.nn.CrossEntropyLoss()
+        )
+        self.model.eval()  # Ensure model is in eval mode
+        with torch.no_grad():
+            for inputs, labels_batch_for_loss in self.test_loader:
+                inputs, labels_batch_for_loss = inputs.to(
+                    self.device
+                ), labels_batch_for_loss.to(self.device)
+                outputs = self.model(inputs)
+                logits_for_eval = (
+                    outputs.logits if hasattr(outputs, "logits") else outputs
+                )
+
+                # Ensure labels are the correct type for the loss function
+                if self.is_binary_classification:
+                    # For BCEWithLogitsLoss, labels should be float
+                    labels_for_loss_calc = labels_batch_for_loss.float()
+                else:
+                    # For CrossEntropyLoss, labels should be long
+                    labels_for_loss_calc = labels_batch_for_loss.long()
+
+                loss = test_criterion(logits_for_eval.squeeze(), labels_for_loss_calc)
+                total_test_loss += loss.item()
+
+        avg_test_loss = (
+            total_test_loss / len(self.test_loader)
+            if len(self.test_loader) > 0
+            else 0.0
+        )
+
         if self.is_binary_classification:
+            # all_probs_for_metrics_list should be a flat list of P(class_1) values
             all_probs_np = np.array(
                 all_probs_for_metrics_list_corrected
-            )  # Shape (n_samples,)
+            )  # Expected shape (n_samples,)
         else:  # Multiclass
             if all_probs_for_metrics_list_corrected:  # Check if not empty
                 all_probs_np = np.vstack(
@@ -562,7 +632,9 @@ class ModelEvaluator:
         # --- Corrected loop and all_probs_np formation --- END
 
         unique_true_and_pred_labels = sorted(
-            list(np.unique(np.concatenate((all_labels, all_preds))))
+            list(
+                np.unique(np.concatenate((all_labels, all_preds)))
+            )  # Uses corrected all_labels and all_preds
         )
         # print(
         #     f"DEBUG: Unique labels found in true and preds: {unique_true_and_pred_labels}"
@@ -607,8 +679,8 @@ class ModelEvaluator:
         #     f"Debug: Classification report will use target_names: {target_names_for_report} and labels: {unique_true_and_pred_labels}"
         # )
         report_dict = classification_report(
-            all_labels,
-            all_preds,
+            all_labels,  # Uses corrected all_labels
+            all_preds,  # Uses corrected all_preds
             target_names=target_names_for_report,
             labels=unique_true_and_pred_labels,
             output_dict=True,
@@ -622,7 +694,10 @@ class ModelEvaluator:
                 "binary" if self.is_binary_classification else "multiclass"
             ),
             "num_classes_model": self.num_classes,
-            "accuracy": np.mean(all_preds == all_labels),
+            "test_accuracy": np.mean(
+                all_preds == all_labels
+            ),  # Uses corrected all_preds and all_labels
+            "test_loss": avg_test_loss,  # Added test loss
             "classification_report": report_dict,
             "roc_auc": None,
             "pr_auc": None,
@@ -676,13 +751,26 @@ class ModelEvaluator:
             )  # Use NpEncoder for numpy types
 
         self.plot_confusion_matrix(
-            all_labels, all_preds, target_names_for_report, "confusion_matrix.png"
+            all_labels,
+            all_preds,
+            target_names_for_report,
+            "confusion_matrix.png",  # Uses corrected all_labels and all_preds
         )
 
         if "history" in self.checkpoint:
             self.plot_training_history(
                 self.checkpoint["history"], "training_history.png"
             )
+            # Extract final training and validation metrics
+            history = self.checkpoint["history"]
+            if history.get("train_loss") and len(history["train_loss"]) > 0:
+                metrics["final_train_loss"] = history["train_loss"][-1]
+            if history.get("val_loss") and len(history["val_loss"]) > 0:
+                metrics["final_val_loss"] = history["val_loss"][-1]
+            if history.get("train_acc") and len(history["train_acc"]) > 0:
+                metrics["final_train_acc"] = history["train_acc"][-1]
+            if history.get("val_acc") and len(history["val_acc"]) > 0:
+                metrics["final_val_acc"] = history["val_acc"][-1]
 
         print(
             f"Evaluation complete for {self.model_filename}. Results saved to {self.evaluation_subdir}"
@@ -824,7 +912,12 @@ def append_to_evaluation_csv(metrics_data, csv_filepath):
         "vit_model_checkpoint",
         "training_type",  # General training type (supervised, semi-supervised, etc.)
         "training_time_seconds",
-        "accuracy",
+        "test_accuracy",
+        "test_loss",
+        "final_train_loss",
+        "final_val_loss",
+        "final_train_acc",
+        "final_val_acc",
         "weighted_precision",
         "weighted_recall",
         "weighted_f1_score",
