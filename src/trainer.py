@@ -3,7 +3,78 @@ import torch.nn as nn
 import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader, ConcatDataset, Dataset
+from PIL import Image
+import csv
+import pandas as pd
+
+
+class PseudoLabelDataset(Dataset):
+    """
+    A dataset to load images and their pseudo-labels from a CSV file.
+    """
+
+    def __init__(self, csv_file, transform=None, binary_classification=True):
+        self.data_frame = pd.read_csv(csv_file)
+        self.transform = transform
+        self.binary_classification = binary_classification
+
+    def __len__(self):
+        return len(self.data_frame)
+
+    def __getitem__(self, idx):
+        img_path = self.data_frame.iloc[idx, 0]
+        pseudo_label = self.data_frame.iloc[idx, 1]
+
+        try:
+            image = Image.open(img_path).convert("RGB")
+        except FileNotFoundError:
+            print(f"Error: Image file not found at {img_path}")
+            # Return a placeholder or raise an error
+            image = Image.new("RGB", (224, 224))  # Placeholder
+            # For classification, a consistent label type is important
+            pseudo_label = 0 if self.binary_classification else 0  # Placeholder label
+        except Exception as e:
+            print(f"Error loading image {img_path}: {e}")
+            image = Image.new("RGB", (224, 224))  # Placeholder
+            pseudo_label = 0 if self.binary_classification else 0  # Placeholder label
+
+        if self.transform:
+            # Check if transform is from ViTFeatureExtractor
+            # ViT's processor returns a dict with 'pixel_values', and adds a batch dim
+            if callable(
+                getattr(self.transform, "is_fast", None)
+            ) or "ViTImageProcessor" in str(
+                type(
+                    self.transform.__self__
+                    if hasattr(self.transform, "__self__")
+                    else self.transform
+                )
+            ):  # Heuristic check
+                processed = self.transform(
+                    image
+                )  # ViT processor typically handles its own tensor conversion
+                if isinstance(processed, dict) and "pixel_values" in processed:
+                    image = processed["pixel_values"].squeeze(
+                        0
+                    )  # Remove batch dim if present
+                elif torch.is_tensor(processed):  # If it directly returns a tensor
+                    image = processed.squeeze(0) if processed.ndim == 4 else processed
+                else:
+                    # Fallback or error if unexpected transform output
+                    print(f"Unexpected output from ViT transform: {type(processed)}")
+                    # Assuming ToTensor might be needed if not handled
+                    image = (
+                        transforms.ToTensor()(image)
+                        if not torch.is_tensor(image)
+                        else image
+                    )
+
+            else:  # Assuming standard torchvision transform
+                image = self.transform(image)
+
+        label_dtype = torch.float32 if self.binary_classification else torch.long
+        return image, torch.tensor(pseudo_label, dtype=label_dtype)
 
 
 class ModelTrainer:
@@ -600,35 +671,87 @@ class ModelTrainer:
 
     def generate_pseudo_labels(self, model, unlabeled_loader):
         """
-        Generate pseudo-labels for unlabeled data
+        Generate pseudo-labels for unlabeled data and save paths/labels to a CSV.
+        Returns a DataLoader for the pseudo-labeled dataset.
         """
         model.eval()
-        pseudo_images, pseudo_labels = [], []
+        pseudo_data_for_csv = []  # To store (image_path, pseudo_label)
+
+        # Determine the root directory and original dataset from the unlabeled_loader
+        # unlabeled_loader.dataset is likely a torch.utils.data.Subset
+        # unlabeled_loader.dataset.dataset is the original OxfordPetDataset
+        original_dataset = unlabeled_loader.dataset.dataset
+        root_dir = original_dataset.root_dir
+
+        # Get the correct transform from the original dataset, which was used to create the loader
+        # This is important if the original_dataset had specific ViT transforms.
+        current_transform = original_dataset.transform
+
+        print(f"Original dataset for pseudo-labeling: {type(original_dataset)}")
+        print(f"Transform being used for PseudoLabelDataset: {type(current_transform)}")
 
         with torch.no_grad():
-            for images, _ in tqdm(
+            # Iterate through batches of images
+            batch_start_index = 0
+            for images_batch, _ in tqdm(
                 unlabeled_loader, desc="Generating pseudo-labels progress"
             ):
-                images = images.to(self.device)
-                outputs = model(images)
+                images_batch = images_batch.to(self.device)
+                outputs = model(images_batch)
 
-                preds = (
-                    (torch.sigmoid(outputs) > 0.5).float().squeeze()
+                preds_batch = (
+                    (torch.sigmoid(outputs) > 0.5)
+                    .float()
+                    .squeeze(-1)  # Ensure squeeze is appropriate
                     if self.binary_classification
                     else outputs.argmax(dim=1)
                 )
 
-                pseudo_images.extend(images.cpu())
-                pseudo_labels.extend(preds.cpu())
+                # Get original image names/paths for this batch
+                # The indices in unlabeled_loader.dataset.indices map to the full_dataset
+                batch_size = images_batch.size(0)
+                original_indices_in_full_dataset = unlabeled_loader.dataset.indices[
+                    batch_start_index : batch_start_index + batch_size
+                ]
 
-        dataset = torch.utils.data.TensorDataset(
-            torch.stack(pseudo_images),
-            torch.tensor(
-                pseudo_labels,
-                dtype=torch.float32 if self.binary_classification else torch.long,
-            ),
+                for i, original_idx in enumerate(original_indices_in_full_dataset):
+                    img_name, _ = original_dataset.data[original_idx]
+                    # Ensure .jpg extension, some datasets might have .jpeg or other
+                    if not img_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                        img_path = os.path.join(root_dir, "images", img_name + ".jpg")
+                    else:  # if it already has an extension (less likely with Oxford list.txt)
+                        img_path = os.path.join(root_dir, "images", img_name)
+
+                    pseudo_label_for_this_image = preds_batch[i].item()
+                    pseudo_data_for_csv.append((img_path, pseudo_label_for_this_image))
+
+                batch_start_index += batch_size
+
+        # Save to CSV
+        csv_file_path = "pseudo_labels_temp.csv"
+        # Ensure pandas is imported if you use it here, or stick to csv module
+        # For simplicity, using csv module directly:
+        if "pd" not in globals():  # Simple check if pandas was imported as pd
+            import pandas as pd  # Import locally if not global
+
+        df = pd.DataFrame(pseudo_data_for_csv, columns=["image_path", "pseudo_label"])
+        df.to_csv(csv_file_path, index=False)
+        print(f"Pseudo labels saved to {csv_file_path}")
+
+        # Create a new Dataset and DataLoader for the pseudo-labeled data
+        # Pass the original transform used by the unlabeled_loader
+        pseudo_dataset = PseudoLabelDataset(
+            csv_file_path=csv_file_path,
+            transform=current_transform,  # Use the transform from the source dataset
+            binary_classification=self.binary_classification,
         )
-        return DataLoader(dataset, batch_size=32, shuffle=True)
+
+        # Clean up temporary file after DataLoader is created if desired, or handle externally
+        # For now, leave it for inspection. Consider adding os.remove(csv_file_path) later.
+
+        return DataLoader(
+            pseudo_dataset, batch_size=unlabeled_loader.batch_size, shuffle=True
+        )
 
     def _plot_history(self):
         if not self.history["train_loss"]:  # Check if history is empty
