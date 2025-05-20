@@ -1,292 +1,247 @@
-% Custom style file based on neurips_2024.sty with footer removed
-\NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{custom_style}[2024/03/31 Custom style based on NeurIPS 2024]
+\documentclass{article}
+\PassOptionsToPackage{numbers,compress}{natbib}
+% Use NeurIPS style
+\usepackage[final]{neurips_2024}
 
-% declare final option, which creates camera-ready copy
-\newif\if@neuripsfinal\@neuripsfinalfalse
-\DeclareOption{final}{
-  \@neuripsfinaltrue
+% Additional packages
+\usepackage[utf8]{inputenc}
+\bibliographystyle{unsrtnat}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+
+\title{Comparing ResNet and Vision Transformers: Supervised vs Semi-Supervised Learning for Pet Breed Classification}
+
+\author{%
+  Francesco Olivieri \\
+  KTH Royal Institute of Technology \\
+  \texttt{olivieri@kth.se} \\
+  \And
+  Inês Mesquita \\
+  KTH Royal Institute of Technology \\
+  \texttt{inesm@kth.se} \\
+  \And
+  Leandro Duarte \\
+  KTH Royal Institute of Technology \\
+  \texttt{ldr0@kth.se} \\
 }
 
-% declare nonatbib option, which does not load natbib in case of
-% package clash (users can pass options to natbib via
-% \PassOptionsToPackage)
-\newif\if@natbib\@natbibtrue
-\DeclareOption{nonatbib}{
-  \@natbibfalse
-}
+\begin{document}
 
-% declare preprint option, which creates a preprint version ready for
-% upload to, e.g., arXiv
-\newif\if@preprint\@preprintfalse
-\DeclareOption{preprint}{
-  \@preprinttrue
-}
+\maketitle
 
-\ProcessOptions\relax
+\begin{abstract}
+This project conducts a comparative analysis of ResNet50 and Vision Transformer (ViT) architectures for pet breed classification using the Oxford-IIIT Pet Dataset. We investigate their performance under both fully supervised and semi-supervised learning (SSL) paradigms, with a specific focus on pseudo-labeling as the SSL technique. The study emphasizes the practical implementation aspects of these distinct architectures and learning strategies, particularly how they adapt to a specialized visual recognition task under varying degrees of label availability. The core objective is to provide insights into the relative strengths and weaknesses of ResNet50 and ViT when employing transfer learning and SSL for fine-grained classification, thereby informing choices for similar real-world scenarios.
 
-% determine whether this is an anonymized submission
-\newif\if@submission\@submissiontrue
-\if@neuripsfinal\@submissionfalse\fi
-\if@preprint\@submissionfalse\fi
+\end{abstract}
 
-% fonts
-\renewcommand{\rmdefault}{ptm}
-\renewcommand{\sfdefault}{phv}
+\newpage
+\section{Introduction}
+The task of image classification, that is, assigning a label to an image from a predefined set of categories, has a wide-range of applications, such as in computer vision. However, training models with high accuracies from scratch often necessitates vast amounts of labeled data, which can be expensive and time-consuming to acquire. Transfer learning offers a powerful tool to mitigate this challenge by leveraging knowledge from models pre-trained on large-scale datasets and adapting them to new, specific tasks with significantly less data. Our project explores this concept through the specific problem of pet breed classification using the Oxford-IIT Pet Dataset, a task that serves as an excellent benchmark for evaluating fine-tuning strategies.
 
-% acknowledgments
-\usepackage{environ}
-\newcommand{\acksection}{\section*{Acknowledgments and Disclosure of Funding}}
-\NewEnviron{ack}{%
-  \acksection
-  \BODY
-}
+Our report focuses on a comparative analysis of two architectures. We evaluate ResNet50, a Convolutional Neural Network against Vision Transformer (ViT), specifically the Hugging Face implementation. Furthermore, recognizing that the scarcity of labeled data can be posed as a problem, we extend our analysis to the domain of semi-supervided learning (SSL). SSL techniques are particularly important as they aim to harness the information present in abundant unlabeled data alongside limited labeled examples. In this project, we specifically implement pseudo-labeling and evaluate the performance of both ResNet50 and ViT as the proportion of labeled training data is progressively reduced. This allows us to assess their robustness and the efficacy of SSL in data-constrained regimes. Ultimately, our findings aim to contribute to a better understanding of how these distinct architectures and learning strategies perform when adapting to specialized visual recognition tasks.
 
-% load natbib unless told otherwise
-\if@natbib
-  \RequirePackage{natbib}
-\fi
 
-% set page geometry
-\usepackage[verbose=true,letterpaper]{geometry}
-\AtBeginDocument{
-  \newgeometry{
-    textheight=9in,
-    textwidth=5.5in,
-    top=1in,
-    headheight=12pt,
-    headsep=25pt,
-    footskip=30pt
-  }
-  \@ifpackageloaded{fullpage}
-    {\PackageWarning{custom_style}{fullpage package not allowed! Overwriting formatting.}}
-    {}
-}
+% Describe the problem and its importance
+% Briefly describe what you did and give an overview of results
+% Why is transfer learning important?
+% Why compare ResNet and ViT?
+% Why study semi-supervised learning?
 
-\widowpenalty=10000
-\clubpenalty=10000
-\flushbottom
-\sloppy
 
-% font sizes with reduced leading
-\renewcommand{\normalsize}{%
-  \@setfontsize\normalsize\@xpt\@xipt
-  \abovedisplayskip      7\p@ \@plus 2\p@ \@minus 5\p@
-  \abovedisplayshortskip \z@ \@plus 3\p@
-  \belowdisplayskip      \abovedisplayskip
-  \belowdisplayshortskip 4\p@ \@plus 3\p@ \@minus 3\p@
-}
-\normalsize
-\renewcommand{\small}{%
-  \@setfontsize\small\@ixpt\@xpt
-  \abovedisplayskip      6\p@ \@plus 1.5\p@ \@minus 4\p@
-  \abovedisplayshortskip \z@  \@plus 2\p@
-  \belowdisplayskip      \abovedisplayskip
-  \belowdisplayshortskip 3\p@ \@plus 2\p@   \@minus 2\p@
-}
-\renewcommand{\footnotesize}{\@setfontsize\footnotesize\@ixpt\@xpt}
-\renewcommand{\scriptsize}{\@setfontsize\scriptsize\@viipt\@viiipt}
-\renewcommand{\tiny}{\@setfontsize\tiny\@vipt\@viipt}
-\renewcommand{\large}{\@setfontsize\large\@xiipt{14}}
-\renewcommand{\Large}{\@setfontsize\Large\@xivpt{16}}
-\renewcommand{\LARGE}{\@setfontsize\LARGE\@xviipt{20}}
-\renewcommand{\huge}{\@setfontsize\huge\@xxpt{23}}
-\renewcommand{\Huge}{\@setfontsize\Huge\@xxvpt{28}}
+\section{Related Work}
+% Discuss published work related to:
+% 1. Transfer learning with CNNs and Vision Transformers
+% 2. Semi-supervised learning techniques
+% 3. Pet breed classification or similar fine-grained classification tasks
+Recent studies have explored the transferability and effectiveness of visual representations from CNNs and Transformers. Raghu et al.\cite{convnetvstransformers} compared ConvNets and Vision Transformers, showing that Transformers can outperform CNNs in transfer learning tasks, although they typically require more data. Similarly, research comparing CNN, ResNet, and Vision Transformers for chest disease classification\cite{chest} found that Transformers often achieved higher accuracy, underscoring their potential in complex image recognition tasks.
 
-% sections with less space
-\providecommand{\section}{}
-\renewcommand{\section}{%
-  \@startsection{section}{1}{\z@}%
-                {-2.0ex \@plus -0.5ex \@minus -0.2ex}%
-                { 1.5ex \@plus  0.3ex \@minus  0.2ex}%
-                {\large\bf\raggedright}%
-}
-\providecommand{\subsection}{}
-\renewcommand{\subsection}{%
-  \@startsection{subsection}{2}{\z@}%
-                {-1.8ex \@plus -0.5ex \@minus -0.2ex}%
-                { 0.8ex \@plus  0.2ex}%
-                {\normalsize\bf\raggedright}%
-}
-\providecommand{\subsubsection}{}
-\renewcommand{\subsubsection}{%
-  \@startsection{subsubsection}{3}{\z@}%
-                {-1.5ex \@plus -0.5ex \@minus -0.2ex}%
-                { 0.5ex \@plus  0.2ex}%
-                {\normalsize\bf\raggedright}%
-}
-\providecommand{\paragraph}{}
-\renewcommand{\paragraph}{%
-  \@startsection{paragraph}{4}{\z@}%
-                {1.5ex \@plus 0.5ex \@minus 0.2ex}%
-                {-1em}%
-                {\normalsize\bf}%
-}
-\providecommand{\subparagraph}{}
-\renewcommand{\subparagraph}{%
-  \@startsection{subparagraph}{5}{\z@}%
-                {1.5ex \@plus 0.5ex \@minus 0.2ex}%
-                {-1em}%
-                {\normalsize\bf}%
-}
-\providecommand{\subsubsubsection}{}
-\renewcommand{\subsubsubsection}{%
-  \vskip5pt{\noindent\normalsize\rm\raggedright}%
-}
+However, these works primarily focus on fully supervised learning and specific domains like medical imaging, leaving a gap in evaluating these architectures under semi-supervised conditions. Moreover, comparisons are often limited to multi-class classification without considering binary scenarios. Our work addresses these gaps by comparing ResNet and Vision Transformers in both supervised and semi-supervised settings, across both binary and multi-class pet breed classification tasks.
 
-% float placement
-\renewcommand{\topfraction      }{0.85}
-\renewcommand{\bottomfraction   }{0.4}
-\renewcommand{\textfraction     }{0.1}
-\renewcommand{\floatpagefraction}{0.7}
 
-\newlength{\@neuripsabovecaptionskip}\setlength{\@neuripsabovecaptionskip}{7\p@}
-\newlength{\@neuripsbelowcaptionskip}\setlength{\@neuripsbelowcaptionskip}{\z@}
 
-\setlength{\abovecaptionskip}{\@neuripsabovecaptionskip}
-\setlength{\belowcaptionskip}{\@neuripsbelowcaptionskip}
+\section{Data}
+The project utilizes the Oxford-IIIT Pet Dataset \cite{Parkhi2012}, a benchmark for fine-grained visual classification. It contains 7,349 images of 37 pet breeds, with around 200 images per class. The dataset features significant variations in scale, pose, and lighting. Annotations include breed, head Region of Interest (ROI), and pixel-level trimap segmentations.
 
-% swap above/belowcaptionskip lengths for tables
-\renewenvironment{table}
-  {\setlength{\abovecaptionskip}{\@neuripsbelowcaptionskip}%
-   \setlength{\belowcaptionskip}{\@neuripsabovecaptionskip}%
-   \@float{table}}
-  {\end@float}
+For all experiments, images are resized to 224x224 pixels and normalized. Data augmentation techniques such as random horizontal flips and rotations are applied in specific experiments. Vision Transformer (ViT) models utilize specific preprocessing steps via the Hugging Face AutoImageProcessor. The dataset is consistently split into training, validation, and test sets. For the semi-supervised learning (SSL) experiments, the proportion of labeled data in the training set was systematically reduced, with the remainder treated as unlabeled data to assess model performance under data scarcity.
 
-% footnote formatting
-\setlength{\footnotesep }{6.65\p@}
-\setlength{\skip\footins}{9\p@ \@plus 4\p@ \@minus 2\p@}
-\renewcommand{\footnoterule}{\kern-3\p@ \hrule width 12pc \kern 2.6\p@}
-\setcounter{footnote}{0}
+Given that the Oxford-IIIT Pet Dataset is a standard benchmark, various methods have been evaluated on it. State-of-the-art results are often achieved by Transformer-based models; for instance, fine-tuned Vision Transformers have reported accuracies around 94\% \cite{HFNorburayViTPets}. Other competitive approaches include specialized transformer architectures like OmniVec2 \cite{Srivastava2024OmniVec2}. Zero-shot learning with models like CLIP has also demonstrated strong performance, achieving up to 88\% accuracy without dataset-specific fine-tuning \cite{HFMuellje3ViTPets}.
 
-% paragraph formatting
-\setlength{\parindent}{\z@}
-\setlength{\parskip  }{5.5\p@}
 
-% list formatting
-\setlength{\topsep       }{4\p@ \@plus 1\p@   \@minus 2\p@}
-\setlength{\partopsep    }{1\p@ \@plus 0.5\p@ \@minus 0.5\p@}
-\setlength{\itemsep      }{2\p@ \@plus 1\p@   \@minus 0.5\p@}
-\setlength{\parsep       }{2\p@ \@plus 1\p@   \@minus 0.5\p@}
-\setlength{\leftmargin   }{3pc}
-\setlength{\leftmargini  }{\leftmargin}
-\setlength{\leftmarginii }{2em}
-\setlength{\leftmarginiii}{1.5em}
-\setlength{\leftmarginiv }{1.0em}
-\setlength{\leftmarginv  }{0.5em}
-\def\@listi  {\leftmargin\leftmargini}
-\def\@listii {\leftmargin\leftmarginii
-              \labelwidth\leftmarginii
-              \advance\labelwidth-\labelsep
-              \topsep  2\p@ \@plus 1\p@    \@minus 0.5\p@
-              \parsep  1\p@ \@plus 0.5\p@ \@minus 0.5\p@
-              \itemsep \parsep}
-\def\@listiii{\leftmargin\leftmarginiii
-              \labelwidth\leftmarginiii
-              \advance\labelwidth-\labelsep
-              \topsep    1\p@ \@plus 0.5\p@ \@minus 0.5\p@
-              \parsep    \z@
-              \partopsep 0.5\p@ \@plus 0\p@ \@minus 0.5\p@
-              \itemsep \topsep}
-\def\@listiv {\leftmargin\leftmarginiv
-              \labelwidth\leftmarginiv
-              \advance\labelwidth-\labelsep}
-\def\@listv  {\leftmargin\leftmarginv
-              \labelwidth\leftmarginv
-              \advance\labelwidth-\labelsep}
-\def\@listvi {\leftmargin\leftmarginvi
-              \labelwidth\leftmarginvi
-              \advance\labelwidth-\labelsep}
 
-% create title
-\providecommand{\maketitle}{}
-\renewcommand{\maketitle}{%
-  \par
-  \begingroup
-    \renewcommand{\thefootnote}{\fnsymbol{footnote}}
-    % for perfect author name centering
-    \renewcommand{\@makefnmark}{\hbox to \z@{$^{\@thefnmark}$\hss}}
-    % The footnote-mark was overlapping the footnote-text,
-    % added the following to fix this problem               (MK)
-    \long\def\@makefntext##1{%
-      \parindent 1em\noindent
-      \hbox to 1.8em{\hss $\m@th ^{\@thefnmark}$}##1
-    }
-    \thispagestyle{empty}
-    \@maketitle
-    \@thanks
-    % REMOVED THE NOTICE
-  \endgroup
-  \let\maketitle\relax
-  \let\thanks\relax
-}
+\section{Methods}
+This section details the methodologies employed to compare ResNet50 and Vision Transformer (ViT) architectures. Our approach is rooted in transfer learning, leveraging pre-trained models to adapt to the specific classification tasks. We investigate two primary learning paradigms: fully supervised training utilizing all available labels, and semi-supervised learning (SSL) through pseudo-labeling to assess model performance under conditions of reduced label availability. 
 
-% rules for title box at top of first page
-\newcommand{\@toptitlebar}{
-  \hrule height 4\p@
-  \vskip 0.25in
-  \vskip -\parskip%
-}
-\newcommand{\@bottomtitlebar}{
-  \vskip 0.29in
-  \vskip -\parskip
-  \hrule height 1\p@
-  \vskip 0.09in%
-}
 
-% create title (includes both anonymized and non-anonymized versions)
-\providecommand{\@maketitle}{}
-\renewcommand{\@maketitle}{%
-  \vbox{%
-    \hsize\textwidth
-    \linewidth\hsize
-    \vskip 0.1in
-    \@toptitlebar
+% ResNet architecture and configuration
+% Vision Transformer architecture and configuration
+\subsubsection{ResNet50}
+The model structure of Residual Networks (ResNet) \cite{resnet}, more specifically the one of ResNet50, begins with an input layer that accepts images of size 224 × 224 with three color channels (RGB). This is followed by a convolutional layer with 64 filters of size 7 × 7 (stride 2),  which extracts low-level features from the input images. The output is passed through batch normalization to normalize the activations, a ReLU activation function is then used to introduce non-linearity, and a 3x3 max pooling with stride 2 to reduce dimensions and introduce translation invariance. The core of ResNet consists of four stages, each consisting of multiple residual blocks. Each block includes three convolutional layers, each followed by batch normalization and ReLU activation. These blocks incorporate skip connections, which add the input of the block to its output, useful to prevent the vanishing gradient problem and enabling deeper networks. The architecture ends with global average pooling and a dense layer with sigmoid activation for multi-label classification.
+
+\begin{figure}[h]
     \centering
-    {\LARGE\bf \@title\par}
-    \@bottomtitlebar
-    \if@submission
-      \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}
-        Anonymous Author(s) \\
-        Affiliation \\
-        Address \\
-        \texttt{email} \\
-      \end{tabular}%
-    \else
-      \def\And{%
-        \end{tabular}\hfil\linebreak[0]\hfil%
-        \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\ignorespaces%
-      }
-      \def\AND{%
-        \end{tabular}\hfil\linebreak[4]\hfil%
-        \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\ignorespaces%
-      }
-      \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\@author\end{tabular}%
-    \fi
-    \vskip 0.3in \@minus 0.1in
-  }
-}
+    \includegraphics[width=0.8\textwidth]{resnet_arch.png}
+    \caption{ResNet50 Architecture.}
+    \label{fig:resnet_architecture}
+\end{figure}
 
-% Empty the notice command to remove the footer
-\newcommand{\@notice}{}
+For our experiments, we used a pre-trained ResNet-50 model, originally trained on the ImageNet dataset, which contains over one million images across 1,000 categories. Leveraging transfer learning allowed us to benefit from the rich, generalized feature representations learned by the network on a large-scale dataset, especially useful given the smaller size of our own dataset.
 
-% abstract styling
-\renewenvironment{abstract}%
-{%
-  \vskip 0.075in%
-  \centerline%
-  {\large\bf Abstract}%
-  \vspace{0.5ex}%
-  \begin{quote}%
-}
-{
-  \par%
-  \end{quote}%
-  \vskip 1ex%
-}
+To adapt the model to our specific classification tasks, we replaced the original final fully connected layer (originally outputting 1,000 logits) with a new dense layer tailored to the desired number of output classes. In the binary classification task (e.g., distinguishing between cats and dogs), the final layer was modified to output a single neuron with a sigmoid activation function. For the multi-class classification task (e.g., identifying 37 different breeds of cats and dogs), we used a dense layer with 37 output neurons and a softmax activation function to model the probability distribution over the classes.
 
-% Add line numbers
-% \RequirePackage{lineno}
-% \linenumbers
+We fine-tuned the entire model or, in some experiments, froze the earlier layers and only trained the modified classifier head. This allowed us to evaluate the benefit of task-specific tuning versus using fixed pre-trained features. During training, we used categorical cross-entropy for the multi-class case and binary cross-entropy for the binary case, optimizing with the Adam optimizer.
 
-\endinput 
+Additionally, data augmentation techniques such as random horizontal flips, rotations, and color jittering were applied to increase robustness and help generalize better to unseen examples. All images were resized to 224 × 224 to match the input requirements of ResNet-50.
+
+\subsection{ViT}
+% Fine-tuning strategies for ResNet
+% Fine-tuning strategies for Vision Transformer
+% Hyperparameters and optimization details
+For experiments involving the Vision Transformer (ViT), we utilized the \texttt{google/vit-base-patch16-224} model, a version of ViT pre-trained on ImageNet-21k and subsequently fine-tuned on Image-1k. This model was access via the Hugging Face Transformers library \citep{wolf-etal-2020-transformers}. It processes input images of size $224 \times 224$ pixels by dividing them into non-overlapping patches of $16 \times 16$ pixels. The following image depicts the architechture of a Visual Transformer
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{ViT.png}
+    \caption{ViT Architecture.}
+    \label{fig:resnet_architecture}
+\end{figure}
+
+
+As mention in section Data, input images for the ViT model were preprocessed using the specific requirements of the \texttt{google/vit-base-patch16-224} checkpoint. This was handled by the \texttt{AutoImageProcessor} from the Hugging Face library, which includes resizing images to $224 \times 224$ pixels and normalizing them with the model specific mean and standard deviation values. No additional data augmentation, was applied to the ViT inputs during training or evaluation.
+
+The fine-tuning strategy involved adapting the pre-trained ViT model to our specific tasks, binary (dog or cat) and multi-class (37 pet breeds) classification. The original last layer was replaced with a new, randomly initialized linear layer. For the binary classification, this new layer consisted of a single output neuron. Whereas for the multi-class classification, the final layer consisted of 37 output neurons, corresponding to the number of distinct pet breeds.
+
+The ViT models were trained using the Adam optimizer \citep{kingma2014adam}. For the fully supervised learning setting, we conducted experiments with learning rates of $1 \times 10^{-5}$, $3 \times 10^{-5}$, and $5 \times 10^{-5}$ to determine an effective rate for both binary and multi-class tasks. The models were trained for a set number of 1 and, posteriorly 2 epochs. A batch of 32 was used. Regarding the losses, the binary cross entropy was used for the binary classification tasks, and Cross-Entropy Loss for multi-class classification tasks. 
+
+\subsection{Semi-Supervised Learning}
+% Description of the semi-supervised learning technique(s) used
+% Implementation details
+For our semi-supervised learning experiments, the pseudo-labeling technique was implemented \cite{lee2013pseudo}. The core idea behind  pseudo-labeling is to leverage the model's own predictions on unlabeled data to augment the training set. The model is first trained on the available limited labeled data. This model is then used to predict labels for the unlabeled data pool. The model is then retrained on this combined dataset of original labels and high-confidence pseudo-labels, ideally improving its generalization. 
+
+It will now be discussed how we implemented the pseudo-labeling on this project in specific. For each scenario with reduced labeled data, given the best configuration of each model, either ResNet50 or ViT, was tested with 50\%, 10\% and 1\% of the full training set. Then the model in question was trained exclusively on this limited labeled subset. This establishes a baseline supervised. Then, the aforementioned model was used to make predictions on the remaining unlabeled portion of the training dataset. For each unlabeled image, the prediction was accepted as a pseudo-label for that image. The pseudo-labeled images are then added to the original labeled images as the new training set. The model was then retrained using this augmented dataset. The model parameters obtained from the initial supervised training on the limited labeled subset were then further fine-tuned using the augmented dataset, which combined the original ground-truth labels and the newly generated pseudo-labels. This approach of continuing the training process with the inclusion of pseudo-labels aligns with the methodology described in the foundational work on pseudo-labeling by Lee (2013)\cite{lee2013pseudo}. The performance of this retrained model was then evaluated on the held-out test set.  
+
+The process was apllied independently for both ResNEt50 and ViT architectures across the different percentagees of labeled data explored. 
+
+\subsection{Codebase}
+The project was implemented in Python, leveraging libraries such as PyTorch, Hugging Face Transformers, and Scikit-learn. The codebase is structured modularly, with key components including `src/main.py` for experiment orchestration via a command-line interface, `src/dataset.py` for data loading and preprocessing (including specific handling for ResNet50 and ViT, and semi-supervised splits), model definitions within `src/models/`, `src/trainer.py` for managing the training loops (including pseudo-labeling logic and gradual unfreezing for ResNet), and `src/evaluation.py` for performance assessment and results visualization. The complete source code is publicly available on GitHub \cite{OurProject}.
+
+\section{Experiments}
+% Detailed description of experiments and results
+In this section we will compare the performances achieved by our fine-tuned ResNet50 and ViT models in two different settings: fully-supervised and semi-supervised learning. Metrics taken into account are: Test Accuracy, Training Accuracy, Validation Accuracy and AUC.
+
+\subsection{Fully-Supervised Learning}
+% Results from dog vs cat classification
+In the fully-supervised learning setting, models were trained using the entire available labeled portion of the Oxford-IIIT Pet Dataset. This approach serves as a baseline to evaluate the maximum performance achievable with complete label information for both ResNet50 and ViT architectures across the defined tasks.
+
+\subsubsection{Binary Classification}
+For this task, the aim is tho classify whether the animal in the image is a dog or a cat.
+
+ResNet50:  The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.72\% using learning rate 0.01. 
+
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Models performances for fully supervised binary classification} % Your table caption
+    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        Model & Test Acc. (\%) & Train Acc. (\%) & Validation Acc. (\%) & AUC & Train Time (s) \\
+        \hline
+        ResNet50 & 99.72 & 92.62 & 92.68 & 1.00 & N/A \\
+        ViT & 99.86 & 99.68 & 99.86 & 1.00 & N/A \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The Vision Transformer (ViT) model demonstrated strong performance in the binary classification task, achieving near-perfect accuracy and an AUC of 1.0 within a single training epoch using a learning rate of \(5 \times 10^{-5}\). Further experiments showed that training for a second epoch did not yield improvements and, in fact, indicated early signs of overfitting, suggesting that one epoch was optimal for this specific configuration.
+
+\subsubsection{Multi-Class Classification}
+
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Models performances for fully supervised multi-class classification} % Your table caption
+    \label{tab:fully_multi_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        Model & Test Acc. (\%) & Train Acc. (\%) & Validation Acc. (\%) & AUC & Train Time (s) \\
+        \hline
+        ResNet50 & 91 & 92.62 & 92.68 & 0.82 & 0.82 \\
+        Vit & 93 & 93.38 & 93.34 & 0.86 & 0.82 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Semi Supervised Learning}
+% Results from dog vs cat classification
+
+\subsubsection{Binary Classification}
+
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Models performances for semi supervised binary classification} % Your table caption
+    \label{tab:semi_binary_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        Model & Test Acc. (\%) & Train Acc. (\%) & Validation Acc. (\%) & AUC & Train Time (s) \\
+        \hline
+        ResNet50 & 91 & 92.62 & 92.68 & 0.82 & 0.82 \\
+        Vit & 93 & 93.38 & 93.34 & 0.86 & 0.82 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{Multi-Class Classification}
+
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Models performances for semi supervised multi-class classification} % Your table caption
+    \label{tab:semi_multi_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        Model & Test Acc. (\%) & Train Acc. (\%) & Validation Acc. (\%) & AUC & Train Time (s) \\
+        \hline
+        ResNet50 & 91 & 92.62 & 92.68 & 0.82 & 0.82 \\
+        Vit & 93 & 93.38 & 93.34 & 0.86 & 0.82 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Ablation Studies}
+% Effect of different components of your approach
+% Learning rate strategies, regularization, etc.
+
+
+\subsubsection{ResNet50}
+The first approach to fine tune the network was by fine tuning a number n of layers simultanously. By looking at the performances of the network when deeper layers where unfrozen it came out a clear result: high learning rates while beneficial at the most exposed layers (fc), where detrimental when goin deeper into the pre-trained network (cite and explain a bit more). Was gradual unfreezing better than n unfrozen layers? Yes performances was better, but with a low learnign rate (1e-5). So try different learning rates for different layers and: achieve better results. Even better if unfrozen gradually but signs of more overfitting.
+
+\subsubsection{ViT}
+
+\section{Conclusion}
+% Summary of key findings
+% Limitations of the study
+% Suggestions for future work
+
+
+
+\bibliography{references}
+
+
+\appendix
+\section{Additional Experiments}
+% Place for any additional results that didn't fit in the main paper
+
+
+\section{Implementation Details}
+% More detailed information about implementations
+% Hyperparameter settings, training configurations
+
+\end{document}
