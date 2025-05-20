@@ -295,8 +295,7 @@ class ModelEvaluator:
                     )
                 loaded_model = ViT(
                     model_name_or_path=vit_model_identifier,
-                    num_classes=num_classes,  # ViT class expects num_classes to init classifier
-                    pretrained_weights=False,  # We are loading custom weights
+                    binary_classification=self.is_binary_classification,
                 )
                 # print(f"DEBUG: ViT initialized. Num classes: {num_classes}")
             else:
