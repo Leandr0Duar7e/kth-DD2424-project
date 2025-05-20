@@ -606,7 +606,9 @@ class ModelTrainer:
         pseudo_images, pseudo_labels = [], []
 
         with torch.no_grad():
-            for images, _ in unlabeled_loader:
+            for images, _ in tqdm(
+                unlabeled_loader, desc="Generating pseudo-labels progress"
+            ):
                 images = images.to(self.device)
                 outputs = model(images)
 
