@@ -1341,7 +1341,11 @@ def run_experiment_vit_binary_semi():
     )
 
     print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
-    model = ViT(model_name_or_path=vit_model_checkpoint, binary_classification=True)
+    model = ViT(
+        model_name_or_path=vit_model_checkpoint,
+        binary_classification=True,
+        freeze_backbone=True,
+    )
 
     device = get_device()
 
