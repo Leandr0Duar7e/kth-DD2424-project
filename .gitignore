@@ -112,20 +112,3 @@ logs/
 *.log
 wandb/
 
-# Keep .gitkeep files in the evaluation directory PARENT structure
-# Make sure you have placed .gitkeep files in these directories if you want to commit their structure.
-!evaluation/.gitkeep
-!evaluation/resnet/.gitkeep
-!evaluation/resnet/binary/.gitkeep
-evaluation/resnet/binary/*
-!evaluation/resnet/multiclass/.gitkeep
-evaluation/resnet/multiclass/*
-!evaluation/resnet/pretrained/.gitkeep
-evaluation/resnet/pretrained/*
-!evaluation/vit/.gitkeep
-!evaluation/vit/binary/.gitkeep
-evaluation/vit/binary/*
-!evaluation/vit/multiclass/.gitkeep
-evaluation/vit/multiclass/*
-!evaluation/vit/pretrained/.gitkeep
-evaluation/vit/pretrained/*
