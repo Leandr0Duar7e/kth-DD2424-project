@@ -678,20 +678,14 @@ class ModelTrainer:
         pseudo_data_for_csv = []  # To store (image_path, pseudo_label)
 
         # Determine the root directory and original dataset from the unlabeled_loader
-        # unlabeled_loader.dataset is likely a torch.utils.data.Subset
-        # unlabeled_loader.dataset.dataset is the original OxfordPetDataset
         original_dataset = unlabeled_loader.dataset.dataset
         root_dir = original_dataset.root_dir
-
-        # Get the correct transform from the original dataset, which was used to create the loader
-        # This is important if the original_dataset had specific ViT transforms.
         current_transform = original_dataset.transform
 
         print(f"Original dataset for pseudo-labeling: {type(original_dataset)}")
         print(f"Transform being used for PseudoLabelDataset: {type(current_transform)}")
 
         with torch.no_grad():
-            # Iterate through batches of images
             batch_start_index = 0
             for images_batch, _ in tqdm(
                 unlabeled_loader, desc="Generating pseudo-labels progress"
@@ -700,15 +694,11 @@ class ModelTrainer:
                 outputs = model(images_batch)
 
                 preds_batch = (
-                    (torch.sigmoid(outputs) > 0.5)
-                    .float()
-                    .squeeze(-1)  # Ensure squeeze is appropriate
+                    (torch.sigmoid(outputs) > 0.5).float().squeeze(-1)
                     if self.binary_classification
                     else outputs.argmax(dim=1)
                 )
 
-                # Get original image names/paths for this batch
-                # The indices in unlabeled_loader.dataset.indices map to the full_dataset
                 batch_size = images_batch.size(0)
                 original_indices_in_full_dataset = unlabeled_loader.dataset.indices[
                     batch_start_index : batch_start_index + batch_size
@@ -716,10 +706,9 @@ class ModelTrainer:
 
                 for i, original_idx in enumerate(original_indices_in_full_dataset):
                     img_name, _ = original_dataset.data[original_idx]
-                    # Ensure .jpg extension, some datasets might have .jpeg or other
                     if not img_name.lower().endswith((".jpg", ".jpeg", ".png")):
                         img_path = os.path.join(root_dir, "images", img_name + ".jpg")
-                    else:  # if it already has an extension (less likely with Oxford list.txt)
+                    else:
                         img_path = os.path.join(root_dir, "images", img_name)
 
                     pseudo_label_for_this_image = preds_batch[i].item()
@@ -727,27 +716,17 @@ class ModelTrainer:
 
                 batch_start_index += batch_size
 
-        # Save to CSV
         csv_file_path = "pseudo_labels_temp.csv"
-        # Ensure pandas is imported if you use it here, or stick to csv module
-        # For simplicity, using csv module directly:
-        if "pd" not in globals():  # Simple check if pandas was imported as pd
-            import pandas as pd  # Import locally if not global
-
+        # Use pd directly, assuming it's imported at the top of the file
         df = pd.DataFrame(pseudo_data_for_csv, columns=["image_path", "pseudo_label"])
         df.to_csv(csv_file_path, index=False)
         print(f"Pseudo labels saved to {csv_file_path}")
 
-        # Create a new Dataset and DataLoader for the pseudo-labeled data
-        # Pass the original transform used by the unlabeled_loader
         pseudo_dataset = PseudoLabelDataset(
             csv_file_path=csv_file_path,
-            transform=current_transform,  # Use the transform from the source dataset
+            transform=current_transform,
             binary_classification=self.binary_classification,
         )
-
-        # Clean up temporary file after DataLoader is created if desired, or handle externally
-        # For now, leave it for inspection. Consider adding os.remove(csv_file_path) later.
 
         return DataLoader(
             pseudo_dataset, batch_size=unlabeled_loader.batch_size, shuffle=True

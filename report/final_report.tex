@@ -1,8 +1,5 @@
 \documentclass{article}
-
-% Pass options to natbib BEFORE loading neurips_2024
 \PassOptionsToPackage{numbers,compress}{natbib}
-
 % Use NeurIPS style
 \usepackage[final]{neurips_2024}
 
@@ -65,7 +62,7 @@ Our report focuses on a comparative analysis of two architectures. We evaluate R
 
 
 \section{Data}
-The project utilizes the Oxford-IIIT Pet Dataset \\cite{Parkhi2012}, a benchmark for fine-grained visual classification. It contains 7,349 images of 37 pet breeds, with around 200 images per class. The dataset features significant variations in scale, pose, and lighting. Annotations include breed, head Region of Interest (ROI), and pixel-level trimap segmentations.
+The project utilizes the Oxford-IIIT Pet Dataset \cite{Parkhi2012}, a benchmark for fine-grained visual classification. It contains 7,349 images of 37 pet breeds, with around 200 images per class. The dataset features significant variations in scale, pose, and lighting. Annotations include breed, head Region of Interest (ROI), and pixel-level trimap segmentations.
 
 For all experiments, images are resized to 224x224 pixels and normalized. Data augmentation techniques such as random horizontal flips and rotations are applied in specific experiments. Vision Transformer (ViT) models utilize specific preprocessing steps via the Hugging Face AutoImageProcessor. The dataset is consistently split into training, validation, and test sets. For the semi-supervised learning (SSL) experiments, the proportion of labeled data in the training set was systematically reduced, with the remainder treated as unlabeled data to assess model performance under data scarcity.
 
@@ -75,13 +72,13 @@ Given that the Oxford-IIIT Pet Dataset is a standard benchmark, various methods 
 
 \section{Methods}
 % Describe your approaches in detail:
-Adam optimizer.
+We good.
 
 
 % ResNet architecture and configuration
 % Vision Transformer architecture and configuration
 \subsubsection{ResNet50}
-The model structure of Residual Networks (ResNet)  [\cite{he2015deepresiduallearningimage}], more specifically the one of ResNet50, begins with an input layer that accepts images of size 224 × 224 with three color channels (RGB). This is followed by a convolutional layer with 64 filters of size 7 × 7 (stride 2),  which extracts low-level features from the input images. The output is passed through batch normalization to normalize the activations, a ReLU activation function is then used to introduce non-linearity, and a 3x3 max pooling with stride 2 to reduce dimensions and introduce translation invariance. The core of ResNet consists of four stages, each consisting of multiple residual blocks. Each block includes three convolutional layers, each followed by batch normalization and ReLU activation. These blocks incorporate skip connections, which add the input of the block to its output, useful to prevent the vanishing gradient problem and enabling deeper networks. The architecture ends with global average pooling and a dense layer with sigmoid activation for multi-label classification.
+The model structure of Residual Networks (ResNet) \cite{resnet}, more specifically the one of ResNet50, begins with an input layer that accepts images of size 224 × 224 with three color channels (RGB). This is followed by a convolutional layer with 64 filters of size 7 × 7 (stride 2),  which extracts low-level features from the input images. The output is passed through batch normalization to normalize the activations, a ReLU activation function is then used to introduce non-linearity, and a 3x3 max pooling with stride 2 to reduce dimensions and introduce translation invariance. The core of ResNet consists of four stages, each consisting of multiple residual blocks. Each block includes three convolutional layers, each followed by batch normalization and ReLU activation. These blocks incorporate skip connections, which add the input of the block to its output, useful to prevent the vanishing gradient problem and enabling deeper networks. The architecture ends with global average pooling and a dense layer with sigmoid activation for multi-label classification.
 
 \begin{figure}[h]
     \centering
@@ -90,13 +87,11 @@ The model structure of Residual Networks (ResNet)  [\cite{he2015deepresiduallear
     \label{fig:resnet_architecture}
 \end{figure}
 
-For our experiments, we used a pre-trained ResNet50 model(on ImageNet), and we changed the fully connected layer to match our needs. Either for binary classification (cat vs dogs) or multi-class classification (identifying breeds of cats and dogs, 37 different breeds).
-
 For our experiments, we used a pre-trained ResNet-50 model, originally trained on the ImageNet dataset, which contains over one million images across 1,000 categories. Leveraging transfer learning allowed us to benefit from the rich, generalized feature representations learned by the network on a large-scale dataset, especially useful given the smaller size of our own dataset.
 
 To adapt the model to our specific classification tasks, we replaced the original final fully connected layer (originally outputting 1,000 logits) with a new dense layer tailored to the desired number of output classes. In the binary classification task (e.g., distinguishing between cats and dogs), the final layer was modified to output a single neuron with a sigmoid activation function. For the multi-class classification task (e.g., identifying 37 different breeds of cats and dogs), we used a dense layer with 37 output neurons and a softmax activation function to model the probability distribution over the classes.
 
-We fine-tuned the entire model or, in some experiments, froze the earlier layers and only trained the modified classifier head. This allowed us to evaluate the benefit of task-specific tuning versus using fixed pre-trained features. During training, we used categorical cross-entropy for the multi-class case and binary cross-entropy for the binary case, optimizing with the Adam optimizer and applying early stopping to avoid overfitting.
+We fine-tuned the entire model or, in some experiments, froze the earlier layers and only trained the modified classifier head. This allowed us to evaluate the benefit of task-specific tuning versus using fixed pre-trained features. During training, we used categorical cross-entropy for the multi-class case and binary cross-entropy for the binary case, optimizing with the Adam optimizer.
 
 Additionally, data augmentation techniques such as random horizontal flips, rotations, and color jittering were applied to increase robustness and help generalize better to unseen examples. All images were resized to 224 × 224 to match the input requirements of ResNet-50.
 
@@ -104,7 +99,13 @@ Additionally, data augmentation techniques such as random horizontal flips, rota
 % Fine-tuning strategies for ResNet
 % Fine-tuning strategies for Vision Transformer
 % Hyperparameters and optimization details
+For experiments involving the Vision Transformer (ViT), we utilized the \texttt{google/vit-base-patch16-224} model, a version of ViT pre-trained on ImageNet-21k and subsequently fine-tuned on Image-1k. This model was access via the Hugging Face Transformers library \citep{wolf-etal-2020-transformers}. It processes input images of size $224 \times 224$ pixels by dividing them into non-overlapping patches of $16 \times 16$ pixels.
 
+As mention in section Data, input images for the ViT model were preprocessed using the specific requirements of the \texttt{google/vit-base-patch16-224} checkpoint. This was handled by the \texttt{AutoImageProcessor} from the Hugging Face library, which includes resizing images to $224 \times 224$ pixels and normalizing them with the model specific mean and standard deviation values. No additional data augmentation, was applied to the ViT inputs during training or evaluation.
+
+The fine-tuning strategy involved adapting the pre-trained ViT model to our specific tasks, binary (dog or cat) and multi-class (37 pet breeds) classification. The original last layer was replaced with a new, randomly initialized linear layer. For the binary classification, this new layer consisted of a single output neuron. Whereas for the multi-class classification, the final layer consisted of 37 output neurons, corresponding to the number of distinct pet breeds.
+
+The ViT models were trained using the Adam optimizer \citep{kingma2014adam}. For the fully supervised learning setting, we conducted experiments with learning rates of $1 \times 10^{-5}$, $3 \times 10^{-5}$, and $5 \times 10^{-5}$ to determine an effective rate for both binary and multi-class tasks. The models were trained for a set number of 1 and, posteriorly 2 epochs. A batch of 32 was used. Regarding the losses, the binary cross entropy was used for the binary classification tasks, and Cross-Entropy Loss for multi-class classification tasks. 
 
 \subsection{Semi-Supervised Learning}
 % Description of the semi-supervised learning technique(s) used
@@ -116,47 +117,97 @@ It will now be discussed how we implemented the pseudo-labeling on this project 
 The process was apllied independently for both ResNEt50 and ViT architectures across the different percentagees of labeled data explored. 
 
 \subsection{Codebase}
-The project was implemented in Python, leveraging libraries such as PyTorch, Hugging Face Transformers, and Scikit-learn. The codebase is structured modularly, with key components including `src/main.py` for experiment orchestration via a command-line interface, `src/dataset.py` for data loading and preprocessing (including specific handling for ResNet50 and ViT, and semi-supervised splits), model definitions within `src/models/`, `src/trainer.py` for managing the training loops (including pseudo-labeling logic and gradual unfreezing for ResNet), and `src/evaluation.py` for performance assessment and results visualization. A detailed overview of the system architecture, data processing pipeline, and individual module functionalities is available in the project's DeepWiki documentation \cite{OurProjectDeepWiki}. The complete source code is publicly available on GitHub \cite{OurProjectRepoGithub}.
-
-% Add a figure environment here if you create the diagram
-% \begin{figure}[h]
-%     \centering
-%     % \includegraphics[width=0.8\textwidth]{path/to/your/architecture_diagram.png}
-%     \caption{High-level system architecture diagram.}
-%     \label{fig:system_architecture}
-% \end{figure}
+The project was implemented in Python, leveraging libraries such as PyTorch, Hugging Face Transformers, and Scikit-learn. The codebase is structured modularly, with key components including `src/main.py` for experiment orchestration via a command-line interface, `src/dataset.py` for data loading and preprocessing (including specific handling for ResNet50 and ViT, and semi-supervised splits), model definitions within `src/models/`, `src/trainer.py` for managing the training loops (including pseudo-labeling logic and gradual unfreezing for ResNet), and `src/evaluation.py` for performance assessment and results visualization. The complete source code is publicly available on GitHub \cite{OurProject}.
 
 \section{Experiments}
 % Detailed description of experiments and results
-We replaced the last layer of the network for binary classification and fine-tuned only this latter, while the backbone was frozen.
+In this section we will compare the performances achieved by our fine-tuned ResNet50 and ViT models in two different settings: fully-supervised and semi-supervised learning. Metrics taken into account are: Test Accuracy, Training Accuracy, Validation Accuracy and AUC.
 
 \subsection{Fully-Supervised Learning}
 % Results from dog vs cat classification
-Using all the labeled data.
+These settings, will use the whole labeled dataset.
 
 \subsubsection{Binary Classification}
 For this task, the aim is tho classify whether the animal in the image is a dog or a cat.
 
-\subsubsubsection{ResNet50}
-  The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.72\% using learning rate 0.01. 
+ResNet50:  The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.72\% using learning rate 0.01. 
 
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Performance Metrics of Different Models} % Your table caption
+    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
+        \hline
+        CNN & 91 & 92.62 & 92.68 & 0.82 \\
+        ResNet & 93 & 93.38 & 93.34 & 0.86 \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \subsubsection{Multi-Class Classification}
 
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Performance Metrics of Different Models} % Your table caption
+    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
+        \hline
+        CNN & 91 & 92.62 & 92.68 & 0.82 \\
+        ResNet & 93 & 93.38 & 93.34 & 0.86 \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \subsection{Semi-Supervised Learning}
 % Results from dog vs cat classification
 
 \subsubsection{Binary Classification}
 
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Performance Metrics of Different Models} % Your table caption
+    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
+        \hline
+        CNN & 91 & 92.62 & 92.68 & 0.82 \\
+        ResNet & 93 & 93.38 & 93.34 & 0.86 \\
+        \hline
+    \end{tabular}
+\end{table}
+
 \subsubsection{Multi-Class Classification}
 
-
+\renewcommand{\arraystretch}{1.2} 
+\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
+    \centering % Centers the table on the page
+    \caption{Performance Metrics of Different Models} % Your table caption
+    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
+        \hline
+        CNN & 91 & 92.62 & 92.68 & 0.82 \\
+        ResNet & 93 & 93.38 & 93.34 & 0.86 \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \subsection{Ablation Studies}
 % Effect of different components of your approach
 % Learning rate strategies, regularization, etc.
+
+
 \subsubsection{ResNet50}
+The first approach to fine tune the network was by fine tuning a number n of layers simultanously. By looking at the performances of the network when deeper layers where unfrozen it came out a clear result: high learning rates while beneficial at the most exposed layers (fc), where detrimental when goin deeper into the pre-trained network (cite and explain a bit more). Was gradual unfreezing better than n unfrozen layers?
 
 \subsubsection{ViT}
 
