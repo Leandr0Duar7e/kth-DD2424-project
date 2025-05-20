@@ -112,3 +112,4 @@ logs/
 *.log
 wandb/
 
+evaluation/
