@@ -452,25 +452,15 @@ class ModelEvaluator:
                 current_batch_probs_for_roc_pr = None
 
                 if self.is_binary_classification:
-                    if (
-                        self.model_architecture == "resnet"
-                    ):  # ResNet binary outputs [batch, 1] logit
-                        # Sigmoid gives P(class_1) for the single logit output
-                        probs_class_1 = torch.sigmoid(logits_for_eval).squeeze(
-                            -1
-                        )  # Shape: [batch]
-                        current_batch_preds = (probs_class_1 > 0.5).float()
-                        current_batch_probs_for_roc_pr = (
-                            probs_class_1.cpu().numpy()
-                        )  # Store P(class_1)
-                    else:  # Assumes ViT binary or other binary models output [batch, 2] logits
-                        probs_all_classes = torch.softmax(
-                            logits_for_eval, dim=1
-                        )  # Shape: [batch, 2]
-                        current_batch_preds = torch.argmax(probs_all_classes, dim=1)
-                        current_batch_probs_for_roc_pr = (
-                            probs_all_classes[:, 1].cpu().numpy()
-                        )  # Store P(class_1)
+                    # Both ResNet and ViT binary models (as currently defined) output 1 logit.
+                    # Sigmoid gives P(class_1) for the single logit output.
+                    probs_class_1 = torch.sigmoid(logits_for_eval).squeeze(
+                        -1
+                    )  # Shape: [batch]
+                    current_batch_preds = (probs_class_1 > 0.5).float()
+                    current_batch_probs_for_roc_pr = (
+                        probs_class_1.cpu().numpy()
+                    )  # Store P(class_1)
                 else:  # Multiclass
                     probs_all_classes = torch.softmax(
                         logits_for_eval, dim=1
@@ -532,20 +522,13 @@ class ModelEvaluator:
                 current_batch_preds_corrected = None
 
                 if self.is_binary_classification:
-                    if self.model_architecture == "resnet":
-                        probs_class_1 = torch.sigmoid(logits_for_eval).squeeze(-1)
-                        current_batch_preds_corrected = (probs_class_1 > 0.5).float()
-                        all_probs_for_metrics_list_corrected.extend(
-                            probs_class_1.cpu().numpy()
-                        )  # Extends with individual P(class_1) floats
-                    else:  # ViT binary
-                        probs_all_classes = torch.softmax(logits_for_eval, dim=1)
-                        current_batch_preds_corrected = torch.argmax(
-                            probs_all_classes, dim=1
-                        )
-                        all_probs_for_metrics_list_corrected.extend(
-                            probs_all_classes[:, 1].cpu().numpy()
-                        )  # Extends with individual P(class_1) floats
+                    # Both ResNet and ViT binary models (as currently defined) output 1 logit.
+                    # Sigmoid gives P(class_1) for the single logit output.
+                    probs_class_1 = torch.sigmoid(logits_for_eval).squeeze(-1)
+                    current_batch_preds_corrected = (probs_class_1 > 0.5).float()
+                    all_probs_for_metrics_list_corrected.extend(
+                        probs_class_1.cpu().numpy()
+                    )  # Extends with individual P(class_1) floats
                 else:  # Multiclass
                     probs_all_classes = torch.softmax(logits_for_eval, dim=1)
                     current_batch_preds_corrected = torch.argmax(
