@@ -274,6 +274,9 @@ class ModelEvaluator:
                 "classifier.weight",
                 "vit.classifier.weight",
                 "head.weight",
+                "vit_model.classifier.weight",
+                "vit_model.vit.classifier.weight",
+                "vit_model.head.weight",
             ]
             last_layer_weights = None
             for key in possible_keys:
