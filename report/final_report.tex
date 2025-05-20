@@ -99,7 +99,15 @@ Additionally, data augmentation techniques such as random horizontal flips, rota
 % Fine-tuning strategies for ResNet
 % Fine-tuning strategies for Vision Transformer
 % Hyperparameters and optimization details
-For experiments involving the Vision Transformer (ViT), we utilized the \texttt{google/vit-base-patch16-224} model, a version of ViT pre-trained on ImageNet-21k and subsequently fine-tuned on Image-1k. This model was access via the Hugging Face Transformers library \citep{wolf-etal-2020-transformers}. It processes input images of size $224 \times 224$ pixels by dividing them into non-overlapping patches of $16 \times 16$ pixels.
+For experiments involving the Vision Transformer (ViT), we utilized the \texttt{google/vit-base-patch16-224} model, a version of ViT pre-trained on ImageNet-21k and subsequently fine-tuned on Image-1k. This model was access via the Hugging Face Transformers library \citep{wolf-etal-2020-transformers}. It processes input images of size $224 \times 224$ pixels by dividing them into non-overlapping patches of $16 \times 16$ pixels. The following image depicts the architechture of a Visual Transformer
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{resnet_arch.png}
+    \caption{ResNet50 Architecture}
+    \label{fig:resnet_architecture}
+\end{figure}
+
 
 As mention in section Data, input images for the ViT model were preprocessed using the specific requirements of the \texttt{google/vit-base-patch16-224} checkpoint. This was handled by the \texttt{AutoImageProcessor} from the Hugging Face library, which includes resizing images to $224 \times 224$ pixels and normalizing them with the model specific mean and standard deviation values. No additional data augmentation, was applied to the ViT inputs during training or evaluation.
 
@@ -124,28 +132,29 @@ The project was implemented in Python, leveraging libraries such as PyTorch, Hug
 In this section we will compare the performances achieved by our fine-tuned ResNet50 and ViT models in two different settings: fully-supervised and semi-supervised learning. Metrics taken into account are: Test Accuracy, Training Accuracy, Validation Accuracy and AUC.
 
 \subsection{Fully-Supervised Learning}
-% Results from dog vs cat classification
-These settings, will use the whole labeled dataset.
+In the fully-supervised learning setting, models were trained using the entire available labeled portion of the Oxford-IIIT Pet Dataset. This approach serves as a baseline to evaluate the maximum performance achievable with complete label information for both ResNet50 and ViT architectures across the defined tasks.
 
 \subsubsection{Binary Classification}
 For this task, the aim is tho classify whether the animal in the image is a dog or a cat.
 
-ResNet50:  The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.72\% using learning rate 0.01. 
+ResNet50:  The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.72\% using learning rate 0.01.
 
 \renewcommand{\arraystretch}{1.2} 
-\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
-    \centering % Centers the table on the page
-    \caption{Performance Metrics of Different Models} % Your table caption
-    \label{tab:fully_binary_perf} % A unique label for referencing this table later
-    \begin{tabular}{|l|c|c|c|c|}
+\begin{table}[h!] 
+    \centering 
+    \caption{Fully-Supervised Binary Classification Performance.}
+    \label{tab:fully_binary_perf} 
+    \begin{tabular}{|l|c|c|c|c|c|}
         \hline
-        Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
+        Model & Test Acc. (\%) & Train Acc. (\%) & Val. Acc. (\%) & AUC & Train Time (s) \\
         \hline
-        CNN & 91 & 92.62 & 92.68 & 0.82 \\
-        ResNet & 93 & 93.38 & 93.34 & 0.86 \\
+        ResNet50 & 99.72 & N/A & N/A & N/A & N/A \\
+        ViT & 99.86 & 99.68 & 99.86 & 1.00 & N/A \\
         \hline
     \end{tabular}
 \end{table}
+
+The Vision Transformer (ViT) model demonstrated exceptionally strong performance in the binary classification task, achieving near-perfect accuracy and an AUC of 1.0 within a single training epoch using a learning rate of \(5 \times 10^{-5}\). Further experiments showed that training for a second epoch did not yield improvements and, in fact, indicated early signs of overfitting, suggesting that one epoch was optimal for this specific configuration.
 
 \subsubsection{Multi-Class Classification}
 
@@ -154,12 +163,12 @@ ResNet50:  The network was then trained for 2 epochs and a final accuracy on a t
     \centering % Centers the table on the page
     \caption{Performance Metrics of Different Models} % Your table caption
     \label{tab:fully_binary_perf} % A unique label for referencing this table later
-    \begin{tabular}{|l|c|c|c|c|}
+    \begin{tabular}{|l|c|c|c|c|c|}
         \hline
-        Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
+        Model & Test Acc. (\%) & Train Acc. (\%) & Validation Acc. (\%) & AUC & Train Time (s) \\
         \hline
-        CNN & 91 & 92.62 & 92.68 & 0.82 \\
-        ResNet & 93 & 93.38 & 93.34 & 0.86 \\
+        ResNet50 & 91 & 92.62 & 92.68 & 0.82 & 0.82 \\
+        Vit & 93 & 93.38 & 93.34 & 0.86 & 0.82 \\
         \hline
     \end{tabular}
 \end{table}
@@ -173,7 +182,7 @@ ResNet50:  The network was then trained for 2 epochs and a final accuracy on a t
 \begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
     \centering % Centers the table on the page
     \caption{Performance Metrics of Different Models} % Your table caption
-    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \label{tab:semi_binary_perf} % A unique label for referencing this table later
     \begin{tabular}{|l|c|c|c|c|}
         \hline
         Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
@@ -190,7 +199,7 @@ ResNet50:  The network was then trained for 2 epochs and a final accuracy on a t
 \begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
     \centering % Centers the table on the page
     \caption{Performance Metrics of Different Models} % Your table caption
-    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+    \label{tab:semi_multi_perf} % A unique label for referencing this table later
     \begin{tabular}{|l|c|c|c|c|}
         \hline
         Model & Test Accuracy (\%) & Train Accuracy (\%) & Validation Accuracy (\%) & AUC \\
