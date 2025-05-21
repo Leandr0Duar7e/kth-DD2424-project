@@ -140,26 +140,24 @@ In this section we will compare the performances achieved by our fine-tuned ResN
 In the fully-supervised learning setting, models were trained using the entire available labeled portion of the Oxford-IIIT Pet Dataset. This approach serves as a baseline to evaluate the maximum performance achievable with complete label information for both ResNet50 and ViT architectures across the defined tasks.
 
 \subsubsection{Binary Classification}
-For this task, the aim is tho classify whether the animal in the image is a dog or a cat.
-
-ResNet50:  The network was then trained for 2 epochs and a final accuracy on a test set was recorded at 99.72\% using learning rate 0.01. 
+For this task, both networks were trained to distinguish between cats and dogs. Initial experiments with single-epoch training identified optimal learning rates—0.01 for ResNet50 and $5 \times 10^{-5}$ for ViT. Both models were then trained for 2 epochs using these optimal rates, achieving excellent performance as shown in Table \ref{tab:fully_binary_perf}.
 
 \renewcommand{\arraystretch}{1.2} 
-\begin{table}[h!] % [h!] is a placement specifier: 'here' if possible
-    \centering % Centers the table on the page
-    \caption{Models performances for fully supervised binary classification} % Your table caption
-    \label{tab:fully_binary_perf} % A unique label for referencing this table later
+\begin{table}[h!]
+    \centering
+    \caption{Models performances for fully supervised binary classification}
+    \label{tab:fully_binary_perf}
     \begin{tabular}{|l|c|c|c|c|c|}
         \hline
         Model & Test Acc. (\%) & Train Acc. (\%) & Validation Acc. (\%) & AUC & Train Time (s) \\
         \hline
         ResNet50 & 99.72 & 92.62 & 92.68 & 1.00 & N/A \\
-        ViT & 99.86 & 99.68 & 99.86 & 1.00 & N/A \\
+        ViT & 99.73 & 99.27 & 99.73 & 1.00 & N/A \\
         \hline
     \end{tabular}
 \end{table}
 
-The Vision Transformer (ViT) model demonstrated strong performance in the binary classification task, achieving near-perfect accuracy and an AUC of 1.0 within a single training epoch using a learning rate of \(5 \times 10^{-5}\). Further experiments showed that training for a second epoch did not yield improvements and, in fact, indicated early signs of overfitting, suggesting that one epoch was optimal for this specific configuration.
+Both architectures surpassed the 99\% accuracy target with comparable test performance, though ViT exhibited higher training and validation accuracies than ResNet50, suggesting potentially better generalization capabilities.
 
 \subsubsection{Multi-Class Classification}
 
@@ -221,7 +219,7 @@ The Vision Transformer (ViT) model demonstrated strong performance in the binary
 
 
 \subsubsection{ResNet50}
-The first approach to fine tune the network was by fine tuning a number n of layers simultanously. By looking at the performances of the network when deeper layers where unfrozen it came out a clear result: high learning rates while beneficial at the most exposed layers (fc), where detrimental when goin deeper into the pre-trained network (cite and explain a bit more). Was gradual unfreezing better than n unfrozen layers? Yes performances was better, but with a low learnign rate (1e-5). So try different learning rates for different layers and: achieve better results. Even better if unfrozen gradually but signs of more overfitting.
+The first approach to fine tune the network was by fine tuning a number n of layers simultanously. By looking at the performances of the network when deeper layers where unfrozen it came out a clear result: high learning rates while beneficial at the most exposed layers (fc), where detrimental when goin deeper into the pre-trained network (cite and explain a bit more). Was gradual unfreezing better than n unfrozen layers? Yes performances was better, but with a low learnign rate (1e-5). So try different learning rates for different layers and: achieve better results. Even better if unfrozen gradually but signs of more overfitting. data augmentation improve gperformance on test set of 1\%
 
 \subsubsection{ViT}
 

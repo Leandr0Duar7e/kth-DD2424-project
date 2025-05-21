@@ -104,6 +104,7 @@ def display_progress_with_humor(iterable, desc="Processing", total=None):
 
         yield item
 
+
 def compute_class_weights(dataset, num_classes):
     """
     Computes inverse-frequency class weights for use in CrossEntropyLoss.
@@ -113,9 +114,12 @@ def compute_class_weights(dataset, num_classes):
         label_counts[int(label)] += 1
 
     total = sum(label_counts.values())
-    weights = [total / (num_classes * label_counts[i]) if i in label_counts else 0.0
-               for i in range(num_classes)]
+    weights = [
+        total / (num_classes * label_counts[i]) if i in label_counts else 0.0
+        for i in range(num_classes)
+    ]
     return torch.tensor(weights, dtype=torch.float)
+
 
 def get_oversampled_loader(dataset, batch_size):
     """
@@ -129,3 +133,22 @@ def get_oversampled_loader(dataset, batch_size):
     sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
 
     return DataLoader(dataset, batch_size=batch_size, sampler=sampler)
+
+
+def is_vit_model(model):
+    """
+    Checks if a model is a Vision Transformer (ViT) model.
+
+    Args:
+        model: The model to check
+
+    Returns:
+        bool: True if the model is a Vision Transformer, False otherwise
+    """
+    # Check for ViT class name
+    is_vit = model.__class__.__name__ == "ViT"
+
+    # Check for ViT method to be sure
+    has_vit_method = hasattr(model, "get_trainable_blocks_info")
+
+    return is_vit and has_vit_method
