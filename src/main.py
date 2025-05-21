@@ -2081,7 +2081,7 @@ def run_experiment_vit_multiclass():
         lr_config_vit_mc = [lr_input_vit_mc]
         experiment_params["learning_rate"] = lr_config_vit_mc[0]
 
-        l2_lambda_vit_mc = 0.0  # Default for ViT supervised
+        l2_lambda_vit_mc = 0.0001  # Default for ViT supervised
         experiment_params["l2_lambda"] = l2_lambda_vit_mc
 
         use_scheduler = (
