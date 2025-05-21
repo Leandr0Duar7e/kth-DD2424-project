@@ -1937,17 +1937,20 @@ def run_experiment_vit_multiclass():
         try:
             user_input_vit_layers = int(
                 input(
-                    f"\nEnter the number of final ViT encoder layers to fine-tune (0-{num_total_vit_encoder_layers}) "
-                    f"or enter -1 to fine-tune all layers (unfreeze entire backbone): "
+                    f"\nChoose ViT fine-tuning strategy:\n"
+                    f"  Enter 0-{num_total_vit_encoder_layers} to fine-tune that many encoder layers\n"
+                    f"  Enter -1 to fine-tune all layers (unfreeze entire backbone)\n"
+                    f"  Enter -2 for gradual unfreezing (Strategy 2 in the assignment)\n"
+                    f"> "
                 ).strip()
             )
 
             if (
-                user_input_vit_layers < -1
+                user_input_vit_layers < -2
                 or user_input_vit_layers > num_total_vit_encoder_layers
             ):
                 print(
-                    f"Invalid input. Please enter a value between 0 and {num_total_vit_encoder_layers}, or -1."
+                    f"Invalid input. Please enter a value between 0 and {num_total_vit_encoder_layers}, or -1/-2."
                 )
                 print(f"Defaulting to fine-tuning only the classifier (0 layers).")
                 num_vit_layers_to_train = 0
@@ -1963,7 +1966,11 @@ def run_experiment_vit_multiclass():
         vit_layers_filename_desc = (
             f"vitlayers{num_vit_layers_to_train}"
             if num_vit_layers_to_train >= 0
-            else "vitlayersALL"
+            else (
+                "vitlayersALL"
+                if num_vit_layers_to_train == -1
+                else "vitlayersGradualUnfreeze"
+            )
         )
 
         # Load data
@@ -1989,6 +1996,15 @@ def run_experiment_vit_multiclass():
                 freeze_backbone=False,  # Unfreeze entire backbone
             )
             print("ViT model initialized to fine-tune ALL layers.")
+        elif num_vit_layers_to_train == -2:
+            # Gradual unfreezing (Strategy 2)
+            model = ViT(
+                model_name_or_path=vit_model_checkpoint,
+                binary_classification=False,
+                freeze_backbone=True,  # Start with frozen backbone
+                num_train_encoder_layers=0,  # Start with only classifier trainable
+            )
+            print("ViT model initialized for gradual unfreezing strategy.")
         else:
             # Fine-tune only the classifier or classifier + last N encoder layers
             model = ViT(
@@ -2076,9 +2092,16 @@ def run_experiment_vit_multiclass():
         print(f"\n{get_swedish_waiting_message()}")
 
         start_time = time.time()
-        model, history = trainer.train(
-            train_loader, val_loader, num_epochs=num_epochs_vit_mc, print_graph=True
-        )
+        if num_vit_layers_to_train == -2:
+            # Use the ViT-specific gradual unfreezing method
+            model, history = trainer.train_gradual_unfreezing_vit(
+                train_loader, val_loader, num_epochs=num_epochs_vit_mc, print_graph=True
+            )
+        else:
+            # Use regular training
+            model, history = trainer.train(
+                train_loader, val_loader, num_epochs=num_epochs_vit_mc, print_graph=True
+            )
         end_time = time.time()
         training_time = (
             end_time - start_time

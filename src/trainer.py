@@ -379,6 +379,15 @@ class ModelTrainer:
         Returns:
             Trained model and training history
         """
+        # Import here to avoid circular import
+        from .utils import is_vit_model
+
+        # Check if this is a ViT model - if so, use the specialized method
+        if is_vit_model(self.model):
+            return self.train_gradual_unfreezing_vit(
+                train_loader, val_loader, num_epochs, print_graph
+            )
+
         print(
             f" Start Training {self.model.__class__.__name__} with Gradual Unfreezing for {num_epochs} epochs"
         )
@@ -721,3 +730,191 @@ class ModelTrainer:
         )
 
         print(f"Model saved to {save_path}")
+
+    def train_gradual_unfreezing_vit(
+        self, train_loader, val_loader, num_epochs=10, print_graph=False
+    ):
+        """
+        Train ViT model with gradual unfreezing of transformer encoder layers.
+        This method is specifically designed for Vision Transformer models.
+
+        Args:
+            train_loader: DataLoader for training data
+            val_loader: DataLoader for validation data
+            num_epochs: Number of training epochs
+            print_graph: If True, plots training/validation loss and accuracy
+
+        Returns:
+            Trained model and training history
+        """
+        print(
+            f"Start Training {self.model.__class__.__name__} with Gradual Unfreezing for {num_epochs} epochs"
+        )
+
+        # Check if the model has the required methods for ViT gradual unfreezing
+        if not hasattr(self.model, "get_trainable_blocks_info"):
+            print(
+                "Model doesn't provide trainable blocks info. Using standard training."
+            )
+            return self.train(train_loader, val_loader, num_epochs, print_graph)
+
+        # Get blocks to unfreeze gradually
+        trainable_blocks = self.model.get_trainable_blocks_info()
+
+        if not trainable_blocks:
+            print("No trainable blocks identified. Using standard training.")
+            return self.train(train_loader, val_loader, num_epochs, print_graph)
+
+        print(f"Identified {len(trainable_blocks)} blocks to unfreeze gradually:")
+        for i, block in enumerate(trainable_blocks):
+            print(f"  Block {i}: {block['name']} - {block['description']}")
+
+        # Initialize all blocks as frozen except the classifier (first block)
+        # The classifier should already be trainable by default in the ViT model
+        for block in trainable_blocks[1:]:  # Skip the first block (classifier)
+            for param in block["layer"].parameters():
+                param.requires_grad = False
+
+        # Reset history for a new training session
+        self.history = {
+            "train_loss": [],
+            "train_acc": [],
+            "val_loss": [],
+            "val_acc": [],
+            "learning_rates": [],
+        }
+
+        # Calculate unfreezing schedule
+        total_steps = len(train_loader) * num_epochs
+        blocks_to_unfreeze = trainable_blocks[1:]  # Skip classifier (already unfrozen)
+        unfreeze_interval = (
+            max(1, total_steps // len(blocks_to_unfreeze))
+            if blocks_to_unfreeze
+            else total_steps
+        )
+
+        # Initialize learning rate scheduler if requested
+        if self.use_scheduler:
+            # Using the same scheduler setup as other training methods
+            steps_per_epoch = len(train_loader)
+            total_steps = steps_per_epoch * num_epochs
+
+            base_lr = self.optimizer.param_groups[0]["lr"]
+            max_lr = self.scheduler_params.get("max_lr", base_lr * 10)
+            max_lrs = [max_lr]
+
+            pct_start = self.scheduler_params.get("pct_start", 0.3)
+
+            self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                max_lr=max_lrs,
+                total_steps=total_steps,
+                pct_start=pct_start,
+                anneal_strategy="cos",
+                div_factor=25.0,
+                final_div_factor=10000.0,
+            )
+
+        # Training loop with gradual unfreezing
+        step_counter = 0
+        next_block_to_unfreeze = 0  # Index into blocks_to_unfreeze
+
+        for epoch in range(num_epochs):
+            self.model.train()
+
+            train_loss = 0.0
+            train_correct = 0
+            train_total = 0
+
+            progress_bar = tqdm(
+                train_loader,
+                desc=f"Epoch {epoch+1}/{num_epochs} (ViT Gradual Unfreeze)",
+            )
+
+            for batch_idx, (inputs, labels) in enumerate(progress_bar):
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                if self.binary_classification:
+                    labels = labels.float()
+                else:
+                    labels = labels.long()
+
+                self.optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs.squeeze(), labels)
+                loss.backward()
+
+                # Monitor gradient norms if requested
+                if (
+                    self.monitor_gradients
+                    and (batch_idx + 1) % self.gradient_monitor_interval == 0
+                ):
+                    self._log_gradient_norms(epoch, batch_idx)
+
+                self.optimizer.step()
+
+                # Step the scheduler (per batch)
+                if self.use_scheduler:
+                    self.scheduler.step()
+                    current_lr = self.scheduler.get_last_lr()[0]
+                    self.history["learning_rates"].append(current_lr)
+                else:
+                    current_lr = self.optimizer.param_groups[0]["lr"]
+
+                train_loss += loss.item()
+                predicted = (
+                    (torch.sigmoid(outputs) > 0.5).float()
+                    if self.binary_classification
+                    else outputs.argmax(dim=1)
+                )
+                train_total += labels.size(0)
+                train_correct += (predicted.squeeze() == labels).sum().item()
+
+                current_loss = train_loss / (progress_bar.n + 1)
+                current_acc = 100 * train_correct / train_total
+                progress_bar.set_postfix(
+                    {
+                        "loss": f"{current_loss:.4f}",
+                        "acc": f"{current_acc:.2f}%",
+                        "lr": f"{current_lr:.2e}",
+                    }
+                )
+
+                # Check if it's time to unfreeze the next block
+                step_counter += 1
+                if (
+                    next_block_to_unfreeze < len(blocks_to_unfreeze)
+                    and step_counter % unfreeze_interval == 0
+                ):
+
+                    block = blocks_to_unfreeze[next_block_to_unfreeze]
+                    print(
+                        f"\nUnfreezing block {next_block_to_unfreeze+1}: {block['name']} - {block['description']}"
+                    )
+
+                    # Unfreeze the parameters in this block
+                    for param in block["layer"].parameters():
+                        param.requires_grad = True
+
+                    next_block_to_unfreeze += 1
+
+            # Evaluate on train and validation sets
+            train_loss, train_acc = self.evaluate(train_loader)
+            val_loss, val_acc = self.evaluate(val_loader)
+
+            # Update history
+            self.history["train_loss"].append(train_loss)
+            self.history["train_acc"].append(train_acc)
+            self.history["val_loss"].append(val_loss)
+            self.history["val_acc"].append(val_acc)
+
+            print(
+                f"Epoch {epoch+1}/{num_epochs}: "
+                f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}% | "
+                f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
+            )
+            print("-" * 60)
+
+        if print_graph:
+            self._plot_history()
+
+        return self.model, self.history
