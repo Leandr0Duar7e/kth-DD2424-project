@@ -1,0 +1,248 @@
+{
+    "model_filename": "vit_multiclass_2ep_lr5e-05_sup_vitlayers6_augFalse_bnFalse_gradmon.pth",
+    "model_architecture": "vit",
+    "classification_type": "multiclass",
+    "num_classes_model": 37,
+    "test_accuracy": 0.936141304347826,
+    "test_loss": 0.213598298313825,
+    "classification_report": {
+        "Breed_0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 22.0
+        },
+        "Breed_1": {
+            "precision": 0.9,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.8780487804878049,
+            "support": 21.0
+        },
+        "Breed_2": {
+            "precision": 0.8888888888888888,
+            "recall": 0.5925925925925926,
+            "f1-score": 0.7111111111111111,
+            "support": 27.0
+        },
+        "Breed_3": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 22.0
+        },
+        "Breed_4": {
+            "precision": 1.0,
+            "recall": 0.9523809523809523,
+            "f1-score": 0.975609756097561,
+            "support": 21.0
+        },
+        "Breed_5": {
+            "precision": 0.8,
+            "recall": 1.0,
+            "f1-score": 0.8888888888888888,
+            "support": 20.0
+        },
+        "Breed_6": {
+            "precision": 0.8181818181818182,
+            "recall": 0.9,
+            "f1-score": 0.8571428571428571,
+            "support": 20.0
+        },
+        "Breed_7": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 21.0
+        },
+        "Breed_8": {
+            "precision": 0.92,
+            "recall": 1.0,
+            "f1-score": 0.9583333333333334,
+            "support": 23.0
+        },
+        "Breed_9": {
+            "precision": 0.8235294117647058,
+            "recall": 0.9333333333333333,
+            "f1-score": 0.875,
+            "support": 15.0
+        },
+        "Breed_10": {
+            "precision": 0.9473684210526315,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.9,
+            "support": 21.0
+        },
+        "Breed_11": {
+            "precision": 1.0,
+            "recall": 0.7777777777777778,
+            "f1-score": 0.875,
+            "support": 18.0
+        },
+        "Breed_12": {
+            "precision": 0.95,
+            "recall": 1.0,
+            "f1-score": 0.9743589743589743,
+            "support": 19.0
+        },
+        "Breed_13": {
+            "precision": 0.9444444444444444,
+            "recall": 1.0,
+            "f1-score": 0.9714285714285714,
+            "support": 17.0
+        },
+        "Breed_14": {
+            "precision": 1.0,
+            "recall": 0.8333333333333334,
+            "f1-score": 0.9090909090909091,
+            "support": 18.0
+        },
+        "Breed_15": {
+            "precision": 0.9166666666666666,
+            "recall": 1.0,
+            "f1-score": 0.9565217391304348,
+            "support": 11.0
+        },
+        "Breed_16": {
+            "precision": 0.9444444444444444,
+            "recall": 1.0,
+            "f1-score": 0.9714285714285714,
+            "support": 17.0
+        },
+        "Breed_17": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 15.0
+        },
+        "Breed_18": {
+            "precision": 0.9545454545454546,
+            "recall": 0.9545454545454546,
+            "f1-score": 0.9545454545454546,
+            "support": 22.0
+        },
+        "Breed_19": {
+            "precision": 0.9444444444444444,
+            "recall": 1.0,
+            "f1-score": 0.9714285714285714,
+            "support": 17.0
+        },
+        "Breed_20": {
+            "precision": 1.0,
+            "recall": 0.8888888888888888,
+            "f1-score": 0.9411764705882353,
+            "support": 18.0
+        },
+        "Breed_21": {
+            "precision": 0.84,
+            "recall": 1.0,
+            "f1-score": 0.9130434782608695,
+            "support": 21.0
+        },
+        "Breed_22": {
+            "precision": 1.0,
+            "recall": 0.9615384615384616,
+            "f1-score": 0.9803921568627451,
+            "support": 26.0
+        },
+        "Breed_23": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 13.0
+        },
+        "Breed_24": {
+            "precision": 1.0,
+            "recall": 0.9047619047619048,
+            "f1-score": 0.95,
+            "support": 21.0
+        },
+        "Breed_25": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 21.0
+        },
+        "Breed_26": {
+            "precision": 0.9615384615384616,
+            "recall": 0.8064516129032258,
+            "f1-score": 0.8771929824561403,
+            "support": 31.0
+        },
+        "Breed_27": {
+            "precision": 0.9583333333333334,
+            "recall": 0.8846153846153846,
+            "f1-score": 0.92,
+            "support": 26.0
+        },
+        "Breed_28": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 16.0
+        },
+        "Breed_29": {
+            "precision": 1.0,
+            "recall": 0.9473684210526315,
+            "f1-score": 0.972972972972973,
+            "support": 19.0
+        },
+        "Breed_30": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 19.0
+        },
+        "Breed_31": {
+            "precision": 0.9642857142857143,
+            "recall": 1.0,
+            "f1-score": 0.9818181818181818,
+            "support": 27.0
+        },
+        "Breed_32": {
+            "precision": 0.782608695652174,
+            "recall": 1.0,
+            "f1-score": 0.8780487804878049,
+            "support": 18.0
+        },
+        "Breed_33": {
+            "precision": 1.0,
+            "recall": 0.9523809523809523,
+            "f1-score": 0.975609756097561,
+            "support": 21.0
+        },
+        "Breed_34": {
+            "precision": 0.5833333333333334,
+            "recall": 0.9333333333333333,
+            "f1-score": 0.717948717948718,
+            "support": 15.0
+        },
+        "Breed_35": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 20.0
+        },
+        "Breed_36": {
+            "precision": 1.0,
+            "recall": 0.9411764705882353,
+            "f1-score": 0.9696969696969697,
+            "support": 17.0
+        },
+        "accuracy": 0.936141304347826,
+        "macro avg": {
+            "precision": 0.9416922576372031,
+            "recall": 0.9426693131976261,
+            "f1-score": 0.9379956212341416,
+            "support": 736.0
+        },
+        "weighted avg": {
+            "precision": 0.9445765545706857,
+            "recall": 0.936141304347826,
+            "f1-score": 0.9361627603674825,
+            "support": 736.0
+        }
+    },
+    "roc_auc": null,
+    "pr_auc": null,
+    "roc_auc_ovr_weighted": 0.9993903255166745
+}
