@@ -202,4 +202,7 @@ This section outlines how to set up and run the project on a Google Cloud VM.
 - Inês Mesquita
 - Leandro Duarte
 
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Leandr0Duar7e/kth-DD2424-project)
+
 KTH Royal Institute of Technology, DD2424 Deep Learning in Data Science
