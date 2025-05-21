@@ -1932,6 +1932,40 @@ def run_experiment_vit_multiclass():
         data_augmentation_vit_mc = False
         experiment_params["data_augmentation"] = data_augmentation_vit_mc
 
+        # Prompt for the number of final ViT encoder layers to fine-tune
+        num_total_vit_encoder_layers = 12  # For vit-base-patch16-224
+        try:
+            user_input_vit_layers = int(
+                input(
+                    f"\nEnter the number of final ViT encoder layers to fine-tune (0-{num_total_vit_encoder_layers}) "
+                    f"or enter -1 to fine-tune all layers (unfreeze entire backbone): "
+                ).strip()
+            )
+
+            if (
+                user_input_vit_layers < -1
+                or user_input_vit_layers > num_total_vit_encoder_layers
+            ):
+                print(
+                    f"Invalid input. Please enter a value between 0 and {num_total_vit_encoder_layers}, or -1."
+                )
+                print(f"Defaulting to fine-tuning only the classifier (0 layers).")
+                num_vit_layers_to_train = 0
+            else:
+                num_vit_layers_to_train = user_input_vit_layers
+        except ValueError:
+            print(
+                "Invalid input. Defaulting to fine-tuning only the classifier (0 layers)."
+            )
+            num_vit_layers_to_train = 0
+
+        experiment_params["num_train_encoder_layers"] = num_vit_layers_to_train
+        vit_layers_filename_desc = (
+            f"vitlayers{num_vit_layers_to_train}"
+            if num_vit_layers_to_train >= 0
+            else "vitlayersALL"
+        )
+
         # Load data
         train_loader, val_loader, test_loader, _ = OxfordPetDataset.get_dataloaders(
             data_dir="../data/raw",
@@ -1947,11 +1981,25 @@ def run_experiment_vit_multiclass():
 
         # Load model
         print(f"\nInitializing ViT model ({vit_model_checkpoint})...")
-        model = ViT(
-            model_name_or_path=vit_model_checkpoint,
-            binary_classification=False,
-            freeze_backbone=False,
-        )
+        if num_vit_layers_to_train == -1:
+            # Fine-tune all layers
+            model = ViT(
+                model_name_or_path=vit_model_checkpoint,
+                binary_classification=False,
+                freeze_backbone=False,  # Unfreeze entire backbone
+            )
+            print("ViT model initialized to fine-tune ALL layers.")
+        else:
+            # Fine-tune only the classifier or classifier + last N encoder layers
+            model = ViT(
+                model_name_or_path=vit_model_checkpoint,
+                binary_classification=False,
+                freeze_backbone=True,  # Backbone is initially frozen
+                num_train_encoder_layers=num_vit_layers_to_train,
+            )
+            print(
+                f"ViT model initialized to fine-tune classifier + last {num_vit_layers_to_train} encoder layers."
+            )
 
         device = get_device()
 
@@ -2045,6 +2093,7 @@ def run_experiment_vit_multiclass():
                 f"{num_epochs_vit_mc}ep",
                 f"lr{lr_config_vit_mc[0]}",
                 training_type_str,  # "sup"
+                vit_layers_filename_desc,  # Added layer info
                 f"aug{data_augmentation_vit_mc}",  # augFalse
                 f"bn{finetune_bn_vit_mc}",  # bnFalse
             ]
