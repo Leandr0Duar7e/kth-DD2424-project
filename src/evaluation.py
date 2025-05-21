@@ -909,6 +909,7 @@ def append_to_evaluation_csv(metrics_data, csv_filepath):
         "l2_lambda",
         "monitor_gradients",
         "gradient_monitor_interval",
+        "use_scheduler",
         "vit_model_checkpoint",
         "training_type",  # General training type (supervised, semi-supervised, etc.)
         "training_time_seconds",
