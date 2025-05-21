@@ -160,6 +160,7 @@ def run_experiment_1():
             ).lower()
             == "y"
         )
+        experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
         # Create trainer
         trainer = ModelTrainer(
@@ -325,6 +326,7 @@ def run_experiment_1_semi_supervised():
         input("\nWould you like to use the learning rate scheduler? (y/n): ").lower()
         == "y"
     )
+    experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
     trainer = ModelTrainer(
         model,
@@ -731,6 +733,7 @@ def run_experiment_2_semi_supervised():
         input("\nWould you like to use the learning rate scheduler? (y/n): ").lower()
         == "y"
     )
+    experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
     trainer = ModelTrainer(
         model,
@@ -949,6 +952,7 @@ def run_experiment_2():
         ).lower()
         finetune_bn_r2 = finetune_bn_choice_r2 == "y"
         experiment_params["finetune_bn"] = finetune_bn_r2
+        experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
         actual_lr_config_r2 = []
         lr_filename_desc_r2 = ""
@@ -995,6 +999,7 @@ def run_experiment_2():
             ).lower()
             == "y"
         )
+        experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
         # Create trainer
         trainer = ModelTrainer(
@@ -1200,6 +1205,7 @@ def run_experiment_vit_binary():
             ).lower()
             == "y"
         )
+        experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
         trainer = ModelTrainer(
             model,
@@ -1401,6 +1407,7 @@ def run_experiment_vit_binary_semi():
         input("\nWould you like to use the learning rate scheduler? (y/n): ").lower()
         == "y"
     )
+    experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
     trainer = ModelTrainer(
         model,
@@ -1597,6 +1604,7 @@ def run_experiment_vit_multiclass_semi():
         input("\nWould you like to use the learning rate scheduler? (y/n): ").lower()
         == "y"
     )
+    experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
     trainer = ModelTrainer(
         model,
@@ -1818,6 +1826,7 @@ def run_experiment_vit_multiclass_imbalanced():
         input("\nWould you like to use the learning rate scheduler? (y/n): ").lower()
         == "y"
     )
+    experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
 
     trainer = ModelTrainer(
         model,
@@ -2074,6 +2083,8 @@ def run_experiment_vit_multiclass():
             ).lower()
             == "y"
         )
+        experiment_params["use_scheduler"] = use_scheduler  # Add to experiment_params
+
         trainer = ModelTrainer(
             model,
             device,
