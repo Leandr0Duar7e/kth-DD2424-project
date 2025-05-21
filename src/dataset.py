@@ -24,7 +24,6 @@ class OxfordPetDataset(Dataset):
         self.transform = transform if transform else self._get_transforms()
         self.binary_classification = binary_classification
 
-
         # Load the annotations file
         annotations_file = os.path.join(root_dir, "annotations", "list.txt")
         self.data = []
@@ -102,7 +101,24 @@ class OxfordPetDataset(Dataset):
                         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                     ),  # ImageNet normalization
                 ]
-            ) 
+            )
+
+    @staticmethod
+    def _get_vit_augment_transforms():
+        """
+        Returns a Compose object for ViT data augmentation.
+        These transforms are applied to PIL images before the AutoImageProcessor.
+        """
+        return transforms.Compose(
+            [
+                transforms.RandomResizedCrop(224, scale=(0.8, 1.0), antialias=True),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.ColorJitter(
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                ),
+                transforms.RandomRotation(degrees=10),
+            ]
+        )
 
     @classmethod
     def get_dataloaders(
@@ -135,17 +151,17 @@ class OxfordPetDataset(Dataset):
             num_classes: Number of classes (1 for binary, 37 for multi-class)
         """
         current_transform = None
+        image_processor = None  # Initialize image_processor to be accessible later
+
         if model_type == "vit":
             if not vit_model_name:
                 raise ValueError("vit_model_name must be provided for ViT model type")
             print(f"\nUsing ViT image processor for {vit_model_name}...")
             image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
-            # The transform will take a PIL image and return processed pixel_values tensor
+            # Base transform for ViT (val/test and initial train_subset) - no augmentation here
             current_transform = lambda pil_img: image_processor(
                 images=pil_img, return_tensors="pt"
-            )["pixel_values"].squeeze(
-                0
-            )  # Squeeze(0) removes the batch dimension added by default by the processor when processing a single image.
+            )["pixel_values"].squeeze(0)
         elif model_type == "resnet":
             print(
                 "\nUsing ResNet image transforms (initially non-augmented for split)..."
@@ -180,7 +196,9 @@ class OxfordPetDataset(Dataset):
 
         # Only include 20% of images from each cat breed (classes 0–11) to simulate imbalance
         if apply_imbalance and not binary_classification:
-            print("Applying class imbalance: keeping 20% of cat breed samples in training...")
+            print(
+                "Applying class imbalance: keeping 20% of cat breed samples in training..."
+            )
 
             def create_imbalanced_subset(train_subset, full_dataset, keep_fraction=0.2):
                 from collections import defaultdict
@@ -201,23 +219,45 @@ class OxfordPetDataset(Dataset):
 
                 return torch.utils.data.Subset(full_dataset, imbalanced_indices)
 
-            final_train_dataset = create_imbalanced_subset(train_subset, dataset_for_splitting)
+            final_train_dataset = create_imbalanced_subset(
+                train_subset, dataset_for_splitting
+            )
         else:
             final_train_dataset = train_subset
 
-        if data_augmentation and model_type == "resnet":
-            print("\nApplying data augmentation to the ResNet training set...")
-            # Create a new OxfordPetDataset instance with augmented transforms
-            augmented_dataset_source = cls(
-                root_dir=data_dir,
-                transform=cls._get_transforms(data_augmentation=True),
-                binary_classification=binary_classification,
-            )
-            # Create a new Subset using the indices from the original train_subset,
-            # but pointing to the newly created augmented_dataset_source.
-            final_train_dataset = torch.utils.data.Subset(
-                augmented_dataset_source, train_subset.indices
-            )
+        # Apply data augmentation if specified, after splitting
+        if data_augmentation:
+            if model_type == "resnet":
+                print("\nApplying data augmentation to the ResNet training set...")
+                augmented_dataset_source_resnet = cls(
+                    root_dir=data_dir,
+                    transform=cls._get_transforms(
+                        data_augmentation=True
+                    ),  # ResNet's own augment + ToTensor + Normalize
+                    binary_classification=binary_classification,
+                )
+                final_train_dataset = torch.utils.data.Subset(
+                    augmented_dataset_source_resnet, train_subset.indices
+                )
+            elif model_type == "vit":
+                print("\nApplying data augmentation to the ViT training set...")
+                vit_augment_chain = (
+                    cls._get_vit_augment_transforms()
+                )  # PIL -> PIL augmentations
+
+                # Create a transform that applies PIL augmentations THEN the ViT processor
+                augmented_transform_for_vit_source = lambda pil_img: image_processor(
+                    images=vit_augment_chain(pil_img), return_tensors="pt"
+                )["pixel_values"].squeeze(0)
+
+                augmented_dataset_source_vit = cls(
+                    root_dir=data_dir,
+                    transform=augmented_transform_for_vit_source,
+                    binary_classification=binary_classification,
+                )
+                final_train_dataset = torch.utils.data.Subset(
+                    augmented_dataset_source_vit, train_subset.indices
+                )
 
         # Create data loaders
         train_loader = DataLoader(
@@ -245,19 +285,22 @@ class OxfordPetDataset(Dataset):
         """
         Return (labeled_loader, unlabeled_loader, val_loader, test_loader) for semi-supervised training
         """
+        image_processor = None  # Initialize image_processor
 
-        # --- 1. Choose the base transform ---
+        # --- 1. Choose the base transform (non-augmented) for the full_dataset ---
         if model_type == "vit":
             print(f"\nUsing ViT image processor for {vit_model_name}...")
             image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
             base_transform = lambda pil_img: image_processor(
                 images=pil_img, return_tensors="pt"
             )["pixel_values"].squeeze(0)
-        else:
-            print("\nUsing ResNet image transforms...")
+        else:  # ResNet
+            print(
+                "\nUsing ResNet image transforms (non-augmented for initial full_dataset)..."
+            )
             base_transform = cls._get_transforms(data_augmentation=False)
 
-        # --- 2. Create a single dataset for splitting ---
+        # --- 2. Create a single dataset for splitting (using non-augmented transform) ---
         full_dataset = cls(
             root_dir=data_dir,
             transform=base_transform,
@@ -277,19 +320,41 @@ class OxfordPetDataset(Dataset):
         val_indices = indices[int(0.8 * total_size) : int(0.9 * total_size)]
         test_indices = indices[int(0.9 * total_size) :]
 
-        # --- 4. Apply optional augmentation to labeled set only (for ResNet only) ---
-        if model_type == "resnet" and data_augmentation:
-            print("\nApplying data augmentation to labeled ResNet training set...")
-            augment_transform = cls._get_transforms(data_augmentation=True)
-            augmented_dataset = cls(
-                root_dir=data_dir,
-                transform=augment_transform,
-                binary_classification=binary_classification,
-            )
-            labeled_dataset = torch.utils.data.Subset(
-                augmented_dataset, labeled_indices
-            )
-        else:
+        # --- 4. Apply optional augmentation to labeled set only ---
+        if data_augmentation:
+            if model_type == "resnet":
+                print("\nApplying data augmentation to labeled ResNet training set...")
+                augment_transform_resnet = cls._get_transforms(data_augmentation=True)
+                augmented_dataset_resnet = cls(
+                    root_dir=data_dir,
+                    transform=augment_transform_resnet,
+                    binary_classification=binary_classification,
+                )
+                labeled_dataset = torch.utils.data.Subset(
+                    augmented_dataset_resnet, labeled_indices
+                )
+            elif model_type == "vit":
+                print("\nApplying data augmentation to labeled ViT training set...")
+                # Ensure image_processor is available (it should be from step 1 if model_type is vit)
+                if image_processor is None:  # Should not happen if logic is correct
+                    image_processor = AutoImageProcessor.from_pretrained(vit_model_name)
+
+                vit_augment_chain_ssl = cls._get_vit_augment_transforms()
+                augmented_transform_vit_ssl = lambda pil_img: image_processor(
+                    images=vit_augment_chain_ssl(pil_img), return_tensors="pt"
+                )["pixel_values"].squeeze(0)
+
+                augmented_dataset_source_vit_ssl = cls(
+                    root_dir=data_dir,
+                    transform=augmented_transform_vit_ssl,
+                    binary_classification=binary_classification,
+                )
+                labeled_dataset = torch.utils.data.Subset(
+                    augmented_dataset_source_vit_ssl, labeled_indices
+                )
+            else:  # model_type not resnet or vit, or data_augmentation is False but somehow in this block
+                labeled_dataset = torch.utils.data.Subset(full_dataset, labeled_indices)
+        else:  # No data augmentation for the labeled set
             labeled_dataset = torch.utils.data.Subset(full_dataset, labeled_indices)
 
         unlabeled_dataset = torch.utils.data.Subset(full_dataset, unlabeled_indices)

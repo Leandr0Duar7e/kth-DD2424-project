@@ -1937,9 +1937,16 @@ def run_experiment_vit_multiclass():
             num_epochs_vit_mc = 6
         experiment_params["epochs"] = num_epochs_vit_mc
 
-        # Data augmentation is False for this supervised ViT path
-        data_augmentation_vit_mc = False
+        # Prompt for data augmentation
+        data_aug_choice_vit_mc = input(
+            "\\nDo you want to use data augmentation for ViT training? (y/n, default n): "
+        ).lower()
+        data_augmentation_vit_mc = data_aug_choice_vit_mc == "y"
         experiment_params["data_augmentation"] = data_augmentation_vit_mc
+        if data_augmentation_vit_mc:
+            print("Data augmentation enabled for ViT training.")
+        else:
+            print("Data augmentation disabled for ViT training.")
 
         # Prompt for the number of final ViT encoder layers to fine-tune
         num_total_vit_encoder_layers = 12  # For vit-base-patch16-224
