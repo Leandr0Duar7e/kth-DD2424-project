@@ -2,6 +2,10 @@
 
 This project explores and compares the performance of ResNet and Vision Transformer (ViT) architectures for pet breed classification using the Oxford-IIIT Pet Dataset. It examines both fully supervised and semi-supervised learning approaches, including strategies for handling class imbalance.
 
+## Documentation
+
+For detailed methodology, experimental results, and analysis, see our final report: [`report/ID2424___Deep_Learning_Project.pdf`](report/ID2424___Deep_Learning_Project.pdf)
+
 ## Project Structure
 
 ```
