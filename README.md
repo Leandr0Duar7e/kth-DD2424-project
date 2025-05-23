@@ -10,7 +10,7 @@ For detailed methodology, experimental results, and analysis, see our final repo
 
 The following video demonstrates the execution of our main experiment script and showcases the model training and evaluation process:
 
-[Demo Video: Running Experiment Script](report/Screen%20Recording%202025-05-23%20at%2020.49.39.mov)
+[Demo Video: Running Experiment Script](report/demo.gif)
 
 
 ## Project Structure
