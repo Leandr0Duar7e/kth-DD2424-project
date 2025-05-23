@@ -6,6 +6,13 @@ This project explores and compares the performance of ResNet and Vision Transfor
 
 For detailed methodology, experimental results, and analysis, see our final report: [`report/ID2424___Deep_Learning_Project.pdf`](report/ID2424___Deep_Learning_Project.pdf)
 
+## Demo Video
+
+The following video demonstrates the execution of our main experiment script and showcases the model training and evaluation process:
+
+[Demo Video: Running Experiment Script](report/Screen%20Recording%202025-05-23%20at%2020.49.39.mov)
+
+
 ## Project Structure
 
 ```
